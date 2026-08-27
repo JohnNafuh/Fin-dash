@@ -54,6 +54,375 @@ header p {
 }
 
 
+/* =========================================
+   STATEMENT ANALYZER
+========================================= */
+
+.statement-analyzer {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+
+    padding: 28px 22px;
+    margin-bottom: 22px;
+
+    text-align: center;
+
+    box-shadow:
+        0 10px 30px rgba(23, 21, 29, 0.04);
+
+    overflow: hidden;
+}
+
+
+/* =========================================
+   UPLOAD STATE
+========================================= */
+
+.statement-upload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.upload-icon {
+    width: 52px;
+    height: 52px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 16px;
+
+    background: var(--purple-soft);
+    color: var(--purple);
+
+    font-size: 25px;
+    font-weight: 700;
+
+    margin-bottom: 15px;
+}
+
+.statement-upload h2,
+.statement-analyzing h2,
+.statement-complete h2 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -.4px;
+
+    margin-bottom: 7px;
+}
+
+.statement-upload p {
+    max-width: 300px;
+
+    color: var(--muted);
+
+    font-size: 13px;
+    line-height: 1.5;
+
+    margin-bottom: 9px;
+}
+
+.file-types {
+    color: var(--purple);
+
+    font-size: 10px;
+    font-weight: 700;
+
+    letter-spacing: .8px;
+
+    margin-bottom: 18px;
+}
+
+.upload-button,
+.analyze-another {
+    border: none;
+
+    background:
+        linear-gradient(
+            135deg,
+            #7650ff,
+            #5427d8
+        );
+
+    color: white;
+
+    padding: 13px 22px;
+
+    border-radius: 12px;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 20px rgba(108,60,255,.18);
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease;
+}
+
+.upload-button:hover,
+.analyze-another:hover {
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 11px 25px rgba(108,60,255,.24);
+}
+
+.upload-button:active,
+.analyze-another:active {
+    transform: scale(.97);
+}
+
+.statement-upload small {
+    margin-top: 13px;
+
+    color: var(--muted);
+
+    font-size: 10px;
+}
+
+
+/* =========================================
+   ANALYZING STATE
+========================================= */
+
+.statement-analyzing {
+    min-height: 235px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+}
+
+
+/* =========================================
+   INTERSECTING RINGS
+========================================= */
+
+.statement-rings {
+    position: relative;
+
+    width: 125px;
+    height: 82px;
+
+    perspective: 700px;
+
+    transform-style: preserve-3d;
+
+    margin-bottom: 18px;
+}
+
+.statement-rings span {
+    position: absolute;
+
+    width: 82px;
+    height: 42px;
+
+    left: 21px;
+    top: 19px;
+
+    border: 2px solid var(--purple);
+
+    border-radius: 50%;
+
+    transform-style: preserve-3d;
+
+    box-shadow:
+        0 0 8px rgba(108,60,255,.25),
+        0 0 20px rgba(108,60,255,.10);
+
+    animation:
+        statementRing 2s cubic-bezier(.65,.05,.36,1) infinite;
+}
+
+.statement-rings span:nth-child(2) {
+    border-color: #9275ff;
+    animation-delay: -.66s;
+}
+
+.statement-rings span:nth-child(3) {
+    border-color: #cfc4ff;
+    animation-delay: -1.32s;
+}
+
+
+@keyframes statementRing {
+
+    0% {
+        transform:
+            translateX(-30px)
+            rotateY(62deg)
+            rotateZ(-8deg)
+            scale(.82);
+
+        opacity: .25;
+    }
+
+    20% {
+        opacity: .75;
+    }
+
+    50% {
+        transform:
+            translateX(30px)
+            rotateY(-62deg)
+            rotateZ(8deg)
+            scale(1);
+
+        opacity: 1;
+    }
+
+    80% {
+        opacity: .75;
+    }
+
+    100% {
+        transform:
+            translateX(-30px)
+            rotateY(62deg)
+            rotateZ(-8deg)
+            scale(.82);
+
+        opacity: .25;
+    }
+}
+
+
+.statement-analyzing p {
+    color: var(--muted);
+
+    font-size: 12px;
+
+    margin-bottom: 16px;
+
+    max-width: 280px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* =========================================
+   ANALYSIS PROGRESS
+========================================= */
+
+.analysis-progress {
+    width: 170px;
+    height: 4px;
+
+    background: var(--purple-light);
+
+    border-radius: 20px;
+
+    overflow: hidden;
+}
+
+.analysis-progress-bar {
+    width: 0%;
+    height: 100%;
+
+    background: var(--purple);
+
+    border-radius: 20px;
+
+    transition: width .4s ease;
+}
+
+
+/* =========================================
+   ANALYSIS COMPLETE
+========================================= */
+
+.statement-complete {
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+
+    padding: 8px 0;
+}
+
+.complete-icon {
+    width: 48px;
+    height: 48px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: var(--purple-light);
+    color: var(--purple);
+
+    font-size: 21px;
+    font-weight: 800;
+
+    margin-bottom: 13px;
+}
+
+.statement-complete > p {
+    color: var(--muted);
+
+    font-size: 12px;
+
+    margin-bottom: 20px;
+}
+
+.statement-stats {
+    width: 100%;
+
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+
+    gap: 8px;
+
+    margin-bottom: 20px;
+}
+
+.statement-stats div {
+    background: var(--purple-soft);
+
+    border-radius: 12px;
+
+    padding: 12px 6px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 5px;
+}
+
+.statement-stats strong {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.statement-stats span {
+    color: var(--muted);
+
+    font-size: 9px;
+
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+.analyze-another {
+    font-size: 11px;
+
+    padding: 11px 17px;
+}
+
+
 /* ================================
    BALANCE
 ================================ */
@@ -104,7 +473,10 @@ header p {
     padding: 17px 13px;
     border-radius: 16px;
     border: 1px solid var(--border);
-    transition: transform .2s ease, border-color .2s ease;
+
+    transition:
+        transform .2s ease,
+        border-color .2s ease;
 }
 
 .card:hover {
@@ -530,7 +902,7 @@ section {
 
 
 /* =========================================
-   INTERSECTING RINGS LOADER
+   MARKET LOADING
 ========================================= */
 
 .market-loading {
@@ -554,7 +926,9 @@ section {
 }
 
 
-/* RING CONTAINER */
+/* =========================================
+   MARKET INTERSECTING RINGS
+========================================= */
 
 .rings {
     position: relative;
@@ -566,9 +940,6 @@ section {
 
     transform-style: preserve-3d;
 }
-
-
-/* RINGS */
 
 .rings span {
     position: absolute;
@@ -593,17 +964,11 @@ section {
         intersectRing 2s cubic-bezier(.65,.05,.36,1) infinite;
 }
 
-
-/* SECOND */
-
 .rings span:nth-child(2) {
     border-color: #8d6cff;
 
     animation-delay: -.66s;
 }
-
-
-/* THIRD */
 
 .rings span:nth-child(3) {
     border-color: #d8ceff;
@@ -809,6 +1174,33 @@ footer {
 
     .action {
         font-size: 12px;
+    }
+
+    .statement-analyzer {
+        padding: 25px 18px;
+        border-radius: 20px;
+    }
+
+    .statement-upload h2,
+    .statement-analyzing h2,
+    .statement-complete h2 {
+        font-size: 18px;
+    }
+
+    .statement-stats {
+        gap: 6px;
+    }
+
+    .statement-stats div {
+        padding: 11px 4px;
+    }
+
+    .statement-stats strong {
+        font-size: 11px;
+    }
+
+    .statement-stats span {
+        font-size: 8px;
     }
 
     .market-header {
