@@ -4,10 +4,22 @@
     box-sizing: border-box;
 }
 
+:root {
+    --purple: #6c3cff;
+    --purple-dark: #4d20c9;
+    --purple-light: #eee9ff;
+    --background: #f7f7fb;
+    --white: #ffffff;
+    --text: #17151d;
+    --muted: #85828d;
+    --border: #eceaf1;
+    --red: #e5484d;
+}
+
 body {
     font-family: Arial, Helvetica, sans-serif;
-    background: #f5f6fa;
-    color: #171717;
+    background: var(--background);
+    color: var(--text);
     padding: 20px;
     padding-bottom: 90px;
 }
@@ -26,15 +38,15 @@ header {
 }
 
 header h1 {
-    font-family: Arial, Helvetica, sans-serif;
     font-size: 38px;
     font-weight: 800;
     letter-spacing: -1.5px;
+    color: var(--text);
     margin-bottom: 6px;
 }
 
 header p {
-    color: #777;
+    color: var(--muted);
     font-size: 14px;
 }
 
@@ -42,16 +54,17 @@ header p {
 /* BALANCE */
 
 .balance {
-    background: #171717;
+    background: linear-gradient(135deg, #6c3cff, #5427d8);
     color: white;
-    padding: 25px;
-    border-radius: 20px;
+    padding: 26px;
+    border-radius: 22px;
     margin-bottom: 18px;
+    box-shadow: 0 12px 30px rgba(108, 60, 255, 0.18);
 }
 
 .balance p {
     font-size: 13px;
-    opacity: 0.65;
+    opacity: 0.75;
     margin-bottom: 10px;
 }
 
@@ -71,15 +84,15 @@ header p {
 }
 
 .card {
-    background: white;
+    background: var(--white);
     padding: 17px 13px;
     border-radius: 16px;
-    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--border);
 }
 
 .card p {
     font-size: 12px;
-    color: #777;
+    color: var(--muted);
     margin-bottom: 9px;
 }
 
@@ -108,14 +121,15 @@ section {
 
 .section-title span {
     font-size: 12px;
-    color: #888;
+    color: var(--muted);
 }
 
 .section-title button {
     border: none;
     background: none;
-    color: #555;
+    color: var(--purple);
     font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
 }
 
@@ -134,14 +148,20 @@ section {
 }
 
 .action {
-    border: none;
-    padding: 14px 5px;
+    border: 1px solid var(--border);
+    padding: 15px 5px;
     border-radius: 14px;
-    background: white;
+    background: var(--white);
+    color: var(--text);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+    transition: 0.2s ease;
+}
+
+.action:hover {
+    border-color: var(--purple);
+    color: var(--purple);
 }
 
 .action:active {
@@ -152,8 +172,9 @@ section {
 /* TRANSACTIONS */
 
 .transaction-list {
-    background: white;
+    background: var(--white);
     border-radius: 16px;
+    border: 1px solid var(--border);
     overflow: hidden;
 }
 
@@ -163,7 +184,7 @@ section {
 
 .empty-transaction {
     text-align: center;
-    color: #888;
+    color: var(--muted);
     font-size: 14px;
 }
 
@@ -171,10 +192,10 @@ section {
 /* SPENDING */
 
 .spending {
-    background: white;
+    background: var(--white);
     padding: 20px;
     border-radius: 18px;
-    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--border);
 }
 
 .spending-item {
@@ -197,13 +218,13 @@ section {
 
 .spending-item span {
     font-size: 13px;
-    color: #777;
+    color: var(--muted);
 }
 
 .progress {
     width: 100%;
     height: 7px;
-    background: #eeeeee;
+    background: #eeeef3;
     border-radius: 20px;
     overflow: hidden;
 }
@@ -212,16 +233,17 @@ section {
     height: 100%;
     width: 0%;
     border-radius: 20px;
+    background: var(--purple);
 }
 
 
 /* BUDGET */
 
 .budget {
-    background: white;
+    background: var(--white);
     padding: 20px;
     border-radius: 18px;
-    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--border);
 }
 
 .budget-amount {
@@ -235,12 +257,12 @@ section {
 
 .budget-amount p {
     font-size: 13px;
-    color: #888;
+    color: var(--muted);
 }
 
 .budget-progress {
     height: 9px;
-    background: #eeeeee;
+    background: #eeeef3;
     border-radius: 20px;
     overflow: hidden;
     margin-bottom: 12px;
@@ -250,10 +272,11 @@ section {
     width: 0%;
     height: 100%;
     border-radius: 20px;
+    background: var(--purple);
 }
 
 .budget-message {
-    color: #888;
+    color: var(--muted);
     font-size: 12px;
 }
 
@@ -261,10 +284,10 @@ section {
 /* SAVINGS GOAL */
 
 .goal {
-    background: white;
+    background: var(--white);
     padding: 20px;
     border-radius: 18px;
-    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--border);
 }
 
 .goal-content {
@@ -274,7 +297,7 @@ section {
 }
 
 .goal-content p {
-    color: #777;
+    color: var(--muted);
     font-size: 13px;
     margin-bottom: 6px;
 }
@@ -286,14 +309,14 @@ section {
 
 .goal-content span {
     font-size: 12px;
-    color: #888;
+    color: var(--muted);
 }
 
 .goal-circle {
-    width: 75px;
-    height: 75px;
+    width: 78px;
+    height: 78px;
     border-radius: 50%;
-    border: 7px solid #eeeeee;
+    border: 7px solid var(--purple-light);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -302,27 +325,28 @@ section {
 .goal-circle span {
     font-size: 14px;
     font-weight: bold;
-    color: #333;
+    color: var(--purple);
 }
 
 
 /* FINANCIAL INSIGHTS */
 
 .insight-card {
-    background: white;
+    background: var(--white);
     padding: 18px;
     border-radius: 18px;
+    border: 1px solid var(--border);
     display: flex;
     gap: 15px;
     align-items: flex-start;
-    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
 }
 
 .insight-icon {
     width: 40px;
     height: 40px;
     border-radius: 12px;
-    background: #f0f0f0;
+    background: var(--purple-light);
+    color: var(--purple);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -335,7 +359,7 @@ section {
 }
 
 .insight-card p {
-    color: #777;
+    color: var(--muted);
     font-size: 13px;
     line-height: 1.5;
 }
@@ -348,7 +372,7 @@ section {
     bottom: 0;
     left: 0;
     width: 100%;
-    background: #171717;
+    background: #211344;
     color: white;
     overflow: hidden;
     z-index: 1000;
@@ -378,6 +402,7 @@ section {
 }
 
 .live {
+    color: #bda8ff;
     font-weight: bold;
 }
 
@@ -397,7 +422,7 @@ section {
 footer {
     text-align: center;
     margin-top: 50px;
-    color: #999;
+    color: var(--muted);
     font-size: 12px;
 }
 
