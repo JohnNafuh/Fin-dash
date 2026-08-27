@@ -18,10 +18,15 @@
 
     <main>
 
+        <!-- Balance -->
+
         <section class="balance">
             <p>Total Balance</p>
             <h2>₦0.00</h2>
         </section>
+
+
+        <!-- Financial Summary -->
 
         <section class="summary">
 
@@ -42,6 +47,34 @@
 
         </section>
 
+
+        <!-- Quick Actions -->
+
+        <section class="quick-actions">
+
+            <h2>Quick Actions</h2>
+
+            <div class="action-buttons">
+
+                <button class="action income">
+                    + Income
+                </button>
+
+                <button class="action expense">
+                    − Expense
+                </button>
+
+                <button class="action transfer">
+                    ⇄ Transfer
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- Recent Transactions -->
+
         <section class="transactions">
 
             <div class="section-title">
@@ -49,15 +82,202 @@
                 <button>View All</button>
             </div>
 
-            <p class="empty">No transactions yet.</p>
+            <div class="transaction-list">
+
+                <div class="transaction empty-transaction">
+                    <p>No transactions yet.</p>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Spending Overview -->
+
+        <section class="spending">
+
+            <div class="section-title">
+                <h2>Spending Overview</h2>
+                <span>This Month</span>
+            </div>
+
+            <div class="spending-item">
+                <div>
+                    <p>Food</p>
+                    <span>₦0.00</span>
+                </div>
+
+                <div class="progress">
+                    <div class="progress-bar food"></div>
+                </div>
+            </div>
+
+            <div class="spending-item">
+                <div>
+                    <p>Transport</p>
+                    <span>₦0.00</span>
+                </div>
+
+                <div class="progress">
+                    <div class="progress-bar transport"></div>
+                </div>
+            </div>
+
+            <div class="spending-item">
+                <div>
+                    <p>Bills</p>
+                    <span>₦0.00</span>
+                </div>
+
+                <div class="progress">
+                    <div class="progress-bar bills"></div>
+                </div>
+            </div>
+
+            <div class="spending-item">
+                <div>
+                    <p>Entertainment</p>
+                    <span>₦0.00</span>
+                </div>
+
+                <div class="progress">
+                    <div class="progress-bar entertainment"></div>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- Monthly Budget -->
+
+        <section class="budget">
+
+            <div class="section-title">
+                <h2>Monthly Budget</h2>
+                <span>August</span>
+            </div>
+
+            <div class="budget-amount">
+                <h3>₦0.00</h3>
+                <p>of ₦0.00 spent</p>
+            </div>
+
+            <div class="budget-progress">
+                <div class="budget-progress-bar"></div>
+            </div>
+
+            <p class="budget-message">
+                Add transactions to start tracking your budget.
+            </p>
+
+        </section>
+
+
+        <!-- Savings Goal -->
+
+        <section class="goal">
+
+            <div class="section-title">
+                <h2>Savings Goal</h2>
+                <button>+ New Goal</button>
+            </div>
+
+            <div class="goal-content">
+
+                <div>
+                    <p>New Goal</p>
+                    <h3>₦0.00</h3>
+                    <span>of ₦500,000</span>
+                </div>
+
+                <div class="goal-circle">
+                    <span>0%</span>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Financial Insights -->
+
+        <section class="insights">
+
+            <div class="section-title">
+                <h2>Financial Insights</h2>
+            </div>
+
+            <div class="insight-card">
+
+                <div class="insight-icon">
+                    ✦
+                </div>
+
+                <div>
+                    <h3>Let's get started</h3>
+                    <p>
+                        Add your first transaction and Fin-dash
+                        will start analyzing your spending habits.
+                    </p>
+                </div>
+
+            </div>
 
         </section>
 
     </main>
 
+
+    <!-- Live Market Bar -->
+
+    <div class="market-wrapper">
+
+        <div class="market-bar">
+
+            <div class="market-content">
+
+                <span class="live">
+                    ● LIVE
+                </span>
+
+                <span>
+                    USD/NGN ₦1,530.00
+                    <strong>▲ 0.42%</strong>
+                </span>
+
+                <span>
+                    BTC $113,420
+                    <strong>▲ 1.24%</strong>
+                </span>
+
+                <span>
+                    GOLD $3,420
+                    <strong>▼ 0.18%</strong>
+                </span>
+
+                <span>
+                    S&P 500 6,420
+                    <strong>▲ 0.31%</strong>
+                </span>
+
+                <span>
+                    NASDAQ 21,580
+                    <strong>▲ 0.56%</strong>
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
     <footer>
         <p>Fin-dash</p>
     </footer>
+
+    <script src="script.js"></script>
 
 </body>
 </html>
