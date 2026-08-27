@@ -8,6 +8,7 @@
     --purple: #6c3cff;
     --purple-dark: #4d20c9;
     --purple-light: #eee9ff;
+    --purple-soft: #f5f1ff;
     --background: #f7f7fb;
     --white: #ffffff;
     --text: #17151d;
@@ -15,9 +16,6 @@
     --border: #eceaf1;
     --red: #e5484d;
 }
-
-
-/* BODY */
 
 body {
     font-family: Arial, Helvetica, sans-serif;
@@ -33,7 +31,9 @@ main {
 }
 
 
-/* HEADER */
+/* ================================
+   HEADER
+================================ */
 
 header {
     max-width: 600px;
@@ -43,7 +43,8 @@ header {
 header h1 {
     font-size: 38px;
     font-weight: 800;
-    letter-spacing: -1.5px;
+    letter-spacing: -1.7px;
+    color: var(--text);
     margin-bottom: 6px;
 }
 
@@ -53,30 +54,43 @@ header p {
 }
 
 
-/* BALANCE */
+/* ================================
+   BALANCE
+================================ */
 
 .balance {
-    background: linear-gradient(135deg, #6c3cff, #5427d8);
+    background: linear-gradient(
+        135deg,
+        #7650ff 0%,
+        #6c3cff 45%,
+        #5427d8 100%
+    );
+
     color: white;
     padding: 26px;
     border-radius: 22px;
     margin-bottom: 18px;
-    box-shadow: 0 12px 30px rgba(108, 60, 255, 0.18);
+
+    box-shadow:
+        0 14px 35px rgba(108, 60, 255, 0.20);
 }
 
 .balance p {
     font-size: 13px;
-    opacity: 0.75;
+    opacity: 0.72;
     margin-bottom: 10px;
 }
 
 .balance h2 {
     font-size: 38px;
-    letter-spacing: -1px;
+    font-weight: 700;
+    letter-spacing: -1.2px;
 }
 
 
-/* SUMMARY */
+/* ================================
+   SUMMARY
+================================ */
 
 .summary {
     display: grid;
@@ -90,6 +104,12 @@ header p {
     padding: 17px 13px;
     border-radius: 16px;
     border: 1px solid var(--border);
+    transition: transform .2s ease, border-color .2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    border-color: #ddd5ff;
 }
 
 .card p {
@@ -100,10 +120,13 @@ header p {
 
 .card h3 {
     font-size: 16px;
+    font-weight: 700;
 }
 
 
-/* SECTIONS */
+/* ================================
+   SECTIONS
+================================ */
 
 section {
     margin-bottom: 30px;
@@ -119,6 +142,7 @@ section {
 .section-title h2 {
     font-size: 20px;
     font-weight: 700;
+    letter-spacing: -.4px;
 }
 
 .section-title span {
@@ -128,7 +152,7 @@ section {
 
 .section-title button {
     border: none;
-    background: none;
+    background: transparent;
     color: var(--purple);
     font-size: 13px;
     font-weight: 600;
@@ -136,7 +160,9 @@ section {
 }
 
 
-/* QUICK ACTIONS */
+/* ================================
+   QUICK ACTIONS
+================================ */
 
 .quick-actions h2 {
     font-size: 20px;
@@ -158,20 +184,28 @@ section {
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: 0.2s ease;
+
+    transition:
+        transform .2s ease,
+        border-color .2s ease,
+        color .2s ease,
+        box-shadow .2s ease;
 }
 
 .action:hover {
     border-color: var(--purple);
     color: var(--purple);
+    box-shadow: 0 6px 18px rgba(108,60,255,.08);
 }
 
 .action:active {
-    transform: scale(0.97);
+    transform: scale(.97);
 }
 
 
-/* TRANSACTIONS */
+/* ================================
+   TRANSACTIONS
+================================ */
 
 .transaction-list {
     background: var(--white);
@@ -191,7 +225,9 @@ section {
 }
 
 
-/* SPENDING */
+/* ================================
+   SPENDING
+================================ */
 
 .spending {
     background: var(--white);
@@ -239,7 +275,9 @@ section {
 }
 
 
-/* BUDGET */
+/* ================================
+   BUDGET
+================================ */
 
 .budget {
     background: var(--white);
@@ -254,6 +292,7 @@ section {
 
 .budget-amount h3 {
     font-size: 27px;
+    font-weight: 700;
 }
 
 .budget-amount p {
@@ -272,6 +311,7 @@ section {
 .budget-progress-bar {
     width: 0%;
     height: 100%;
+    border-radius: 20px;
     background: var(--purple);
 }
 
@@ -281,7 +321,9 @@ section {
 }
 
 
-/* SAVINGS */
+/* ================================
+   SAVINGS GOAL
+================================ */
 
 .goal {
     background: var(--white);
@@ -296,8 +338,7 @@ section {
     align-items: center;
 }
 
-.goal-content p,
-.goal-content span {
+.goal-content p {
     color: var(--muted);
     font-size: 13px;
 }
@@ -307,42 +348,56 @@ section {
     margin: 5px 0;
 }
 
+.goal-content span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
 .goal-circle {
     width: 78px;
     height: 78px;
     border-radius: 50%;
     border: 7px solid var(--purple-light);
+
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
 }
 
 .goal-circle span {
     color: var(--purple);
-    font-weight: bold;
+    font-size: 14px;
+    font-weight: 700;
 }
 
 
-/* INSIGHTS */
+/* ================================
+   INSIGHTS
+================================ */
 
 .insight-card {
     background: var(--white);
     padding: 18px;
     border-radius: 18px;
     border: 1px solid var(--border);
+
     display: flex;
     gap: 15px;
+    align-items: flex-start;
 }
 
 .insight-icon {
     width: 40px;
     height: 40px;
     border-radius: 12px;
+
     background: var(--purple-light);
     color: var(--purple);
+
     display: flex;
     align-items: center;
     justify-content: center;
+
     flex-shrink: 0;
 }
 
@@ -358,31 +413,51 @@ section {
 }
 
 
-/* ================================= */
-/* LIVE MARKET BAR */
-/* ================================= */
+/* =========================================
+   LIVE MARKET
+========================================= */
 
 .market-wrapper {
     position: fixed;
+
     bottom: 0;
     left: 0;
+
     width: 100%;
     height: 55px;
-    background: #211344;
+
+    background:
+        linear-gradient(
+            145deg,
+            #24134d,
+            #1d103d
+        );
+
     color: white;
+
     z-index: 1000;
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -8px 25px rgba(33, 19, 68, 0.15);
+
+    border-radius: 21px 21px 0 0;
+
+    box-shadow:
+        0 -12px 35px rgba(33,19,68,.20);
+
     overflow: hidden;
-    transition: height 0.35s ease;
+
+    transition:
+        height .45s cubic-bezier(.22,1,.36,1);
 }
 
 
-/* MARKET HEADER */
+/* ================================
+   MARKET HEADER
+================================ */
 
 .market-header {
     height: 55px;
+
     padding: 0 20px;
+
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -391,62 +466,323 @@ section {
 .market-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
+
     font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.5px;
+
+    letter-spacing: .6px;
 }
 
 .live-dot {
     width: 7px;
     height: 7px;
-    background: #bda8ff;
+
     border-radius: 50%;
-    box-shadow: 0 0 10px #bda8ff;
-    animation: pulse 1.5s infinite;
+
+    background: #bda8ff;
+
+    box-shadow:
+        0 0 5px #bda8ff,
+        0 0 14px rgba(189,168,255,.7);
+
+    animation:
+        marketPulse 1.4s ease-in-out infinite;
 }
 
-@keyframes pulse {
-    0%, 100% {
+@keyframes marketPulse {
+
+    0%,
+    100% {
         opacity: 1;
+        transform: scale(1);
     }
 
     50% {
-        opacity: 0.3;
+        opacity: .35;
+        transform: scale(.7);
     }
 }
 
 .market-header button {
-    border: none;
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
-    width: 30px;
-    height: 30px;
+    width: 31px;
+    height: 31px;
+
+    border: 0;
     border-radius: 9px;
+
+    background: rgba(255,255,255,.09);
+
+    color: white;
+
     font-size: 17px;
+
     cursor: pointer;
+
+    transition:
+        background .2s ease,
+        transform .2s ease;
+}
+
+.market-header button:hover {
+    background: rgba(255,255,255,.15);
 }
 
 
-/* HIDE MARKET CONTENT FOR NOW */
+/* =========================================
+   INTERSECTING RINGS LOADER
+========================================= */
 
-.market-loading,
+.market-loading {
+    height: 170px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 14px;
+}
+
+.market-loading p {
+    color: rgba(255,255,255,.48);
+
+    font-size: 11px;
+
+    letter-spacing: .35px;
+}
+
+
+/* RING CONTAINER */
+
+.rings {
+    position: relative;
+
+    width: 120px;
+    height: 70px;
+
+    perspective: 600px;
+
+    transform-style: preserve-3d;
+}
+
+
+/* RINGS */
+
+.rings span {
+    position: absolute;
+
+    width: 76px;
+    height: 38px;
+
+    left: 22px;
+    top: 16px;
+
+    border: 2px solid #bda8ff;
+
+    border-radius: 50%;
+
+    transform-style: preserve-3d;
+
+    box-shadow:
+        0 0 8px rgba(189,168,255,.45),
+        0 0 18px rgba(108,60,255,.20);
+
+    animation:
+        intersectRing 2s cubic-bezier(.65,.05,.36,1) infinite;
+}
+
+
+/* SECOND */
+
+.rings span:nth-child(2) {
+    border-color: #8d6cff;
+
+    animation-delay: -.66s;
+}
+
+
+/* THIRD */
+
+.rings span:nth-child(3) {
+    border-color: #d8ceff;
+
+    animation-delay: -1.32s;
+}
+
+
+@keyframes intersectRing {
+
+    0% {
+        transform:
+            translateX(-28px)
+            rotateY(62deg)
+            rotateZ(-8deg)
+            scale(.85);
+
+        opacity: .25;
+    }
+
+    20% {
+        opacity: .75;
+    }
+
+    50% {
+        transform:
+            translateX(28px)
+            rotateY(-62deg)
+            rotateZ(8deg)
+            scale(1);
+
+        opacity: 1;
+    }
+
+    80% {
+        opacity: .75;
+    }
+
+    100% {
+        transform:
+            translateX(-28px)
+            rotateY(62deg)
+            rotateZ(-8deg)
+            scale(.85);
+
+        opacity: .25;
+    }
+}
+
+
+/* =========================================
+   MARKET DATA
+========================================= */
+
 .market-data {
-    display: none;
+    padding: 12px 20px 18px;
+}
+
+.market-info {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.market-info > div:first-child {
+    display: flex;
+    flex-direction: column;
+
+    gap: 4px;
+}
+
+.market-info span {
+    color: rgba(255,255,255,.45);
+
+    font-size: 10px;
+
+    letter-spacing: .4px;
+}
+
+.market-info strong {
+    font-size: 22px;
+
+    font-weight: 700;
+
+    letter-spacing: -.6px;
+}
+
+.market-change {
+    font-size: 12px;
+
+    font-weight: 700;
+}
+
+.positive {
+    color: #bda8ff;
 }
 
 
-/* FOOTER */
+/* =========================================
+   FINANCIAL CHART
+========================================= */
+
+.chart-container {
+    position: relative;
+
+    width: 100%;
+    height: 105px;
+
+    margin: 13px 0 10px;
+
+    overflow: hidden;
+}
+
+#marketChart {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+}
+
+
+/* =========================================
+   MARKET ASSETS
+========================================= */
+
+.market-assets {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 10px;
+
+    padding-top: 4px;
+}
+
+.market-assets div {
+    display: flex;
+    flex-direction: column;
+
+    gap: 4px;
+}
+
+.market-assets span {
+    color: rgba(255,255,255,.38);
+
+    font-size: 9px;
+
+    letter-spacing: .45px;
+}
+
+.market-assets strong {
+    color: rgba(255,255,255,.92);
+
+    font-size: 12px;
+
+    font-weight: 600;
+}
+
+
+/* =========================================
+   FOOTER
+========================================= */
 
 footer {
     text-align: center;
+
     margin-top: 50px;
+
     color: var(--muted);
+
     font-size: 12px;
 }
 
 
-/* SMALL PHONES */
+/* =========================================
+   MOBILE
+========================================= */
 
 @media (max-width: 400px) {
 
@@ -477,5 +813,14 @@ footer {
 
     .market-header {
         padding: 0 16px;
+    }
+
+    .market-data {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .chart-container {
+        height: 95px;
     }
 }
