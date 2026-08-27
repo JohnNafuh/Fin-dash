@@ -1,11 +1,10 @@
 @font-face {
     font-family: "Gendy";
-    src: url("Gendy.otf") format("opentype");
+    src: url("./Gendy.otf") format("opentype");
+    font-weight: normal;
+    font-style: normal;
 }
 
-header h1 {
-    font-family: "Gendy", sans-serif;
-}
 * {
     margin: 0;
     padding: 0;
@@ -25,6 +24,7 @@ main {
     margin: 0 auto;
 }
 
+
 /* HEADER */
 
 header {
@@ -33,7 +33,10 @@ header {
 }
 
 header h1 {
-    font-size: 30px;
+    font-family: "Gendy", sans-serif;
+    font-size: 42px;
+    font-weight: normal;
+    letter-spacing: -1px;
     margin-bottom: 6px;
 }
 
@@ -405,13 +408,17 @@ footer {
 }
 
 
-/* MOBILE */
+/* SMALL PHONES */
 
 @media (max-width: 400px) {
 
     body {
         padding: 15px;
         padding-bottom: 80px;
+    }
+
+    header h1 {
+        font-size: 38px;
     }
 
     .balance h2 {
@@ -429,5 +436,4 @@ footer {
     .action {
         font-size: 12px;
     }
-
 }
