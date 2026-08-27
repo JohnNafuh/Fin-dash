@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,9 +17,10 @@
         <p>Your personal finance dashboard</p>
     </header>
 
+
     <main>
 
-        <!-- TOTAL BALANCE -->
+        <!-- BALANCE -->
 
         <section class="balance">
             <p>Total Balance</p>
@@ -26,7 +28,7 @@
         </section>
 
 
-        <!-- FINANCIAL SUMMARY -->
+        <!-- SUMMARY -->
 
         <section class="summary">
 
@@ -78,8 +80,13 @@
         <section class="transactions">
 
             <div class="section-title">
+
                 <h2>Recent Transactions</h2>
-                <button>View All</button>
+
+                <button>
+                    View All
+                </button>
+
             </div>
 
             <div class="transaction-list">
@@ -98,9 +105,13 @@
         <section class="spending">
 
             <div class="section-title">
+
                 <h2>Spending Overview</h2>
+
                 <span>This Month</span>
+
             </div>
+
 
             <div class="spending-item">
 
@@ -165,18 +176,31 @@
         <section class="budget">
 
             <div class="section-title">
+
                 <h2>Monthly Budget</h2>
+
                 <span>August</span>
+
             </div>
+
 
             <div class="budget-amount">
+
                 <h3>₦0.00</h3>
-                <p>of ₦0.00 spent</p>
+
+                <p>
+                    of ₦0.00 spent
+                </p>
+
             </div>
 
+
             <div class="budget-progress">
+
                 <div class="budget-progress-bar"></div>
+
             </div>
+
 
             <p class="budget-message">
                 Add transactions to start tracking your budget.
@@ -190,20 +214,37 @@
         <section class="goal">
 
             <div class="section-title">
+
                 <h2>Savings Goal</h2>
-                <button>+ New Goal</button>
+
+                <button>
+                    + New Goal
+                </button>
+
             </div>
+
 
             <div class="goal-content">
 
                 <div>
+
                     <p>New Goal</p>
+
                     <h3>₦0.00</h3>
-                    <span>of ₦500,000</span>
+
+                    <span>
+                        of ₦500,000
+                    </span>
+
                 </div>
 
+
                 <div class="goal-circle">
-                    <span>0%</span>
+
+                    <span>
+                        0%
+                    </span>
+
                 </div>
 
             </div>
@@ -219,18 +260,24 @@
                 <h2>Financial Insights</h2>
             </div>
 
+
             <div class="insight-card">
 
                 <div class="insight-icon">
                     ✦
                 </div>
 
+
                 <div>
-                    <h3>Let's get started</h3>
+
+                    <h3>
+                        Let's get started
+                    </h3>
 
                     <p>
-                        Add your first transaction and Fin-dash
-                        will start analyzing your spending habits.
+                        Add your first transaction and
+                        Fin-dash will start analyzing
+                        your spending habits.
                     </p>
 
                 </div>
@@ -244,87 +291,154 @@
 
     <!-- LIVE MARKET BAR -->
 
-    <!-- LIVE MARKET BAR -->
+    <div class="market-wrapper">
 
-<div class="market-wrapper">
+        <div class="market-header">
 
-    <div class="market-header">
-        <div>
-            <span class="live-dot"></span>
-            <span>LIVE MARKET</span>
+            <div class="market-title">
+
+                <span class="live-dot"></span>
+
+                <span>
+                    LIVE MARKET
+                </span>
+
+            </div>
+
+
+            <button id="marketToggle">
+                ⌃
+            </button>
+
         </div>
 
-        <button id="marketToggle">⌃</button>
+
+        <!-- LOADING STATE -->
+
+        <div
+            class="market-loading"
+            id="marketLoading"
+        >
+
+            <div class="rings">
+
+                <span></span>
+                <span></span>
+                <span></span>
+
+            </div>
+
+
+            <p>
+                Loading market data...
+            </p>
+
+        </div>
+
+
+        <!-- MARKET DATA -->
+
+        <div
+            class="market-data"
+            id="marketData"
+        >
+
+            <div class="market-info">
+
+                <div>
+
+                    <span>
+                        USD / NGN
+                    </span>
+
+                    <strong id="usdPrice">
+                        ₦1,530.00
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="market-change positive"
+                    id="usdChange"
+                >
+                    +0.42%
+                </div>
+
+            </div>
+
+
+            <!-- CHART -->
+
+            <div class="chart-container">
+
+                <canvas id="marketChart"></canvas>
+
+            </div>
+
+
+            <!-- OTHER ASSETS -->
+
+            <div class="market-assets">
+
+                <div>
+
+                    <span>
+                        BTC
+                    </span>
+
+                    <strong>
+                        $113,420
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        GOLD
+                    </span>
+
+                    <strong>
+                        $3,420
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        S&amp;P 500
+                    </span>
+
+                    <strong>
+                        6,420
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </div>
+
     </div>
-
-    <div class="market-loading" id="marketLoading">
-
-        <div class="rings">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-
-        <p>Loading market data...</p>
-
-    </div>
-
-
-    <div class="market-data" id="marketData">
-
-        <div class="market-info">
-
-            <div>
-                <span>USD / NGN</span>
-                <strong id="usdPrice">₦1,530.00</strong>
-            </div>
-
-            <div class="market-change positive" id="usdChange">
-                +0.42%
-            </div>
-
-        </div>
-
-
-        <div class="chart-container">
-
-            <canvas id="marketChart"></canvas>
-
-        </div>
-
-
-        <div class="market-assets">
-
-            <div>
-                <span>BTC</span>
-                <strong>$113,420</strong>
-            </div>
-
-            <div>
-                <span>GOLD</span>
-                <strong>$3,420</strong>
-            </div>
-
-            <div>
-                <span>S&amp;P 500</span>
-                <strong>6,420</strong>
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
 
 
     <!-- FOOTER -->
 
     <footer>
-        <p>Fin-dash</p>
+
+        <p>
+            Fin-dash
+        </p>
+
     </footer>
 
 
     <script src="script.js"></script>
 
 </body>
+
 </html>
