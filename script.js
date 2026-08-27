@@ -9,88 +9,78 @@
 // ========================================
 
 const analyzer = document.querySelector(".statement-analyzer");
-const uploadButton = document.querySelector(".upload-button");
+const uploadButton = document.getElementById("chooseStatement");
+const statementInput = document.getElementById("statementFile");
 
-let statementInput;
+const uploadState = document.getElementById("statementUpload");
+const analyzingState = document.getElementById("statementAnalyzing");
+const completeState = document.getElementById("statementComplete");
 
 
-// Create file picker automatically
-if (uploadButton) {
+// ========================================
+// FILE UPLOAD
+// ========================================
 
-    statementInput = document.createElement("input");
-
-    statementInput.type = "file";
-    statementInput.accept = ".csv,.xlsx,.pdf";
-    statementInput.style.display = "none";
-
-    document.body.appendChild(statementInput);
-
+if (uploadButton && statementInput) {
 
     uploadButton.addEventListener("click", () => {
         statementInput.click();
     });
 
-
-    statementInput.addEventListener("change", async () => {
+    statementInput.addEventListener("change", () => {
 
         const file = statementInput.files[0];
 
         if (!file) return;
 
-        startStatementAnalysis(file);
-
+        startAnalysis(file);
     });
-
 }
+
+
+// Analyze another statement
+document.getElementById("analyzeAnother")?.addEventListener("click", () => {
+
+    statementInput.value = "";
+
+    uploadState.style.display = "block";
+    analyzingState.style.display = "none";
+    completeState.style.display = "none";
+
+});
 
 
 // ========================================
 // START ANALYSIS
 // ========================================
 
-function startStatementAnalysis(file) {
+function startAnalysis(file) {
 
-    if (!analyzer) return;
+    uploadState.style.display = "none";
+    completeState.style.display = "none";
+    analyzingState.style.display = "flex";
 
-    analyzer.innerHTML = `
-        <div class="statement-analyzing">
-
-            <div class="statement-rings">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-
-            <h2>Statement uploaded</h2>
-
-            <p id="analysisText">
-                Analyzing your finances...
-            </p>
-
-            <div class="analysis-progress">
-                <div
-                    class="analysis-progress-bar"
-                    id="analysisProgress"
-                ></div>
-            </div>
-
-        </div>
-    `;
-
+    const fileName =
+        document.getElementById("analyzingFileName");
 
     const progress =
-        document.getElementById("analysisProgress");
+        document.getElementById("analysisProgressBar");
+
+    if (fileName) {
+        fileName.textContent = file.name;
+    }
+
+    if (progress) {
+        progress.style.width = "0%";
+    }
 
     let value = 0;
 
-
     const loading = setInterval(() => {
 
-        value += Math.random() * 12;
+        value += Math.random() * 10;
 
-        if (value > 92) {
-            value = 92;
-        }
+        if (value > 90) value = 90;
 
         if (progress) {
             progress.style.width = value + "%";
@@ -111,41 +101,20 @@ function startStatementAnalysis(file) {
             setTimeout(() => {
 
                 updateDashboard(data);
-                showAnalysisComplete(data);
+                showComplete(data, file.name);
 
-            }, 500);
+            }, 600);
 
         })
         .catch(error => {
 
             clearInterval(loading);
 
-            console.error(error);
+            console.error("Statement analysis error:", error);
 
-            analyzer.innerHTML = `
-                <div class="statement-upload">
-
-                    <div class="upload-icon">!</div>
-
-                    <h2>Couldn't analyze statement</h2>
-
-                    <p>
-                        Make sure your statement is a
-                        supported CSV, XLSX, or PDF file.
-                    </p>
-
-                    <button
-                        class="upload-button"
-                        onclick="location.reload()"
-                    >
-                        Try Again
-                    </button>
-
-                </div>
-            `;
+            showUploadError();
 
         });
-
 }
 
 
@@ -158,19 +127,14 @@ async function analyzeStatement(file) {
     const extension =
         file.name.split(".").pop().toLowerCase();
 
-
-    // CSV
     if (extension === "csv") {
 
         const text = await file.text();
 
         return parseCSV(text);
-
     }
 
-
-    // XLSX
-    if (extension === "xlsx") {
+    if (extension === "xlsx" || extension === "xls") {
 
         await loadXLSX();
 
@@ -185,15 +149,12 @@ async function analyzeStatement(file) {
         const rows =
             XLSX.utils.sheet_to_json(
                 sheet,
-                { header: 1 }
+                { header: 1, defval: "" }
             );
 
         return parseRows(rows);
-
     }
 
-
-    // PDF
     if (extension === "pdf") {
 
         await loadPDFJS();
@@ -209,8 +170,7 @@ async function analyzeStatement(file) {
 
         for (let i = 1; i <= pdf.numPages; i++) {
 
-            const page =
-                await pdf.getPage(i);
+            const page = await pdf.getPage(i);
 
             const content =
                 await page.getTextContent();
@@ -222,38 +182,35 @@ async function analyzeStatement(file) {
         }
 
         return parsePDFText(text);
-
     }
 
-
-    throw new Error("Unsupported file");
-
+    throw new Error("Unsupported file type");
 }
 
 
 // ========================================
-// CSV
+// CSV PARSER
 // ========================================
 
 function parseCSV(text) {
 
-    const rows =
-        text
-            .split(/\r?\n/)
-            .filter(row => row.trim())
-            .map(row =>
-                row.split(",").map(cell =>
-                    cell.replace(/^"|"$/g, "").trim()
-                )
-            );
+    const rows = text
+        .split(/\r?\n/)
+        .filter(row => row.trim())
+        .map(row =>
+            row.split(",").map(cell =>
+                cell
+                    .replace(/^"|"$/g, "")
+                    .trim()
+            )
+        );
 
     return parseRows(rows);
-
 }
 
 
 // ========================================
-// GENERAL ROW PARSER
+// ROW PARSER
 // ========================================
 
 function parseRows(rows) {
@@ -262,12 +219,48 @@ function parseRows(rows) {
         return emptyData();
     }
 
-
     const headers =
         rows[0].map(h =>
-            String(h).toLowerCase()
+            String(h).toLowerCase().trim()
         );
 
+    const findColumn = (...names) =>
+        headers.findIndex(h =>
+            names.some(name => h.includes(name))
+        );
+
+    const descriptionIndex =
+        findColumn(
+            "description",
+            "narration",
+            "details",
+            "merchant",
+            "particular"
+        );
+
+    const amountIndex =
+        findColumn(
+            "amount",
+            "value"
+        );
+
+    const typeIndex =
+        findColumn(
+            "type",
+            "transaction type"
+        );
+
+    const creditIndex =
+        findColumn(
+            "credit",
+            "deposit"
+        );
+
+    const debitIndex =
+        findColumn(
+            "debit",
+            "withdraw"
+        );
 
     const transactions = [];
 
@@ -277,44 +270,6 @@ function parseRows(rows) {
         const row = rows[i];
 
         if (!row || !row.length) continue;
-
-
-        const descriptionIndex =
-            headers.findIndex(h =>
-                h.includes("description") ||
-                h.includes("narration") ||
-                h.includes("details") ||
-                h.includes("merchant")
-            );
-
-
-        const amountIndex =
-            headers.findIndex(h =>
-                h.includes("amount") ||
-                h.includes("value")
-            );
-
-
-        const typeIndex =
-            headers.findIndex(h =>
-                h.includes("type") ||
-                h.includes("transaction")
-            );
-
-
-        const creditIndex =
-            headers.findIndex(h =>
-                h.includes("credit") ||
-                h.includes("deposit")
-            );
-
-
-        const debitIndex =
-            headers.findIndex(h =>
-                h.includes("debit") ||
-                h.includes("withdraw")
-            );
-
 
         const description =
             descriptionIndex >= 0
@@ -326,14 +281,20 @@ function parseRows(rows) {
         let type = "";
 
 
-        if (creditIndex >= 0 && row[creditIndex]) {
+        if (
+            creditIndex >= 0 &&
+            String(row[creditIndex]).trim()
+        ) {
 
             amount =
                 parseMoney(row[creditIndex]);
 
             type = "credit";
 
-        } else if (debitIndex >= 0 && row[debitIndex]) {
+        } else if (
+            debitIndex >= 0 &&
+            String(row[debitIndex]).trim()
+        ) {
 
             amount =
                 parseMoney(row[debitIndex]);
@@ -347,9 +308,8 @@ function parseRows(rows) {
 
             type =
                 typeIndex >= 0
-                    ? String(row[typeIndex]).toLowerCase()
+                    ? String(row[typeIndex] || "").toLowerCase()
                     : "";
-
         }
 
 
@@ -357,16 +317,23 @@ function parseRows(rows) {
 
 
         transactions.push({
-            description,
-            amount: Math.abs(amount),
-            type: detectType(type, description, amount)
-        });
 
+            description,
+
+            amount: Math.abs(amount),
+
+            type:
+                detectType(
+                    type,
+                    description,
+                    amount
+                )
+
+        });
     }
 
 
     return calculateFinancials(transactions);
-
 }
 
 
@@ -388,40 +355,55 @@ function parsePDFText(text) {
     for (const line of lines) {
 
         const numbers =
-            line.match(/(?:₦|\$)?\s?[\d,]+(?:\.\d{2})?/g);
+            line.match(
+                /(?:₦|\$|£)?\s?-?[\d,]+(?:\.\d{2})?/g
+            );
 
-        if (!numbers || !numbers.length) continue;
+        if (!numbers) continue;
 
+
+        const rawAmount =
+            numbers[numbers.length - 1];
 
         const amount =
-            parseMoney(numbers[numbers.length - 1]);
-
+            parseMoney(rawAmount);
 
         if (!amount) continue;
 
 
         transactions.push({
-            description: line,
-            amount: Math.abs(amount),
-            type: detectType("", line, amount)
-        });
 
+            description: line,
+
+            amount: Math.abs(amount),
+
+            type:
+                detectType(
+                    "",
+                    line,
+                    amount
+                )
+
+        });
     }
 
 
     return calculateFinancials(transactions);
-
 }
 
 
 // ========================================
-// DETECT INCOME / EXPENSE
+// DETECT TRANSACTION TYPE
 // ========================================
 
 function detectType(type, description, amount) {
 
     const value =
-        (type + " " + description).toLowerCase();
+        (
+            type +
+            " " +
+            description
+        ).toLowerCase();
 
 
     if (
@@ -429,8 +411,9 @@ function detectType(type, description, amount) {
         value.includes("deposit") ||
         value.includes("salary") ||
         value.includes("income") ||
-        value.includes("transfer from") ||
-        value.includes("refund")
+        value.includes("refund") ||
+        value.includes("received") ||
+        value.includes("inflow")
     ) {
         return "income";
     }
@@ -442,16 +425,14 @@ function detectType(type, description, amount) {
         value.includes("payment") ||
         value.includes("purchase") ||
         value.includes("pos") ||
-        value.includes("transfer to")
+        value.includes("transfer to") ||
+        value.includes("outflow")
     ) {
         return "expense";
     }
 
 
-    return amount < 0
-        ? "expense"
-        : "expense";
-
+    return "expense";
 }
 
 
@@ -477,48 +458,82 @@ function calculateFinancials(transactions) {
 
 
     return {
-        transactions,
-        income,
-        expenses,
-        savings: income - expenses,
-        balance: income - expenses
-    };
 
+        transactions,
+
+        income,
+
+        expenses,
+
+        savings:
+            income - expenses,
+
+        balance:
+            income - expenses
+
+    };
 }
 
 
 function emptyData() {
 
     return {
-        transactions: [],
-        income: 0,
-        expenses: 0,
-        savings: 0,
-        balance: 0
-    };
 
+        transactions: [],
+
+        income: 0,
+
+        expenses: 0,
+
+        savings: 0,
+
+        balance: 0
+
+    };
 }
 
 
 // ========================================
-// MONEY PARSER
+// MONEY
 // ========================================
 
 function parseMoney(value) {
 
-    if (value === undefined || value === null) {
+    if (
+        value === undefined ||
+        value === null
+    ) {
         return 0;
     }
 
 
-    let number =
-        String(value)
-            .replace(/[₦$£,\s]/g, "")
-            .replace(/[()]/g, "");
+    const raw = String(value).trim();
+
+    const negative =
+        raw.includes("-") ||
+        (
+            raw.includes("(") &&
+            raw.includes(")")
+        );
 
 
-    return parseFloat(number) || 0;
+    const number =
+        parseFloat(
+            raw.replace(
+                /[₦$£,\s()]/g,
+                ""
+            )
+        );
 
+
+    if (isNaN(number)) {
+        return 0;
+    }
+
+
+    return negative
+        ? -Math.abs(number)
+        : number;
 }
 
 
@@ -532,7 +547,9 @@ function updateDashboard(data) {
         document.querySelector(".balance h2");
 
     const cards =
-        document.querySelectorAll(".summary .card h3");
+        document.querySelectorAll(
+            ".summary .card h3"
+        );
 
 
     if (balance) {
@@ -551,13 +568,13 @@ function updateDashboard(data) {
 
         cards[2].textContent =
             formatNaira(data.savings);
-
     }
 
 
-    // Recent transactions
     const list =
-        document.querySelector(".transaction-list");
+        document.querySelector(
+            ".transaction-list"
+        );
 
 
     if (list && data.transactions.length) {
@@ -580,80 +597,116 @@ function updateDashboard(data) {
 
                         <strong>
                             ${transaction.type === "income" ? "+" : "-"}
-                            ${formatNaira(transaction.amount)}
+                            ${formatNaira(
+                                transaction.amount
+                            )}
                         </strong>
 
                     </div>
 
                 `)
                 .join("");
+    }
+}
 
+
+// ========================================
+// COMPLETE
+// ========================================
+
+function showComplete(data, fileName) {
+
+    analyzingState.style.display = "none";
+    completeState.style.display = "flex";
+
+    const name =
+        document.getElementById(
+            "statementFileName"
+        );
+
+    const count =
+        document.getElementById(
+            "transactionCount"
+        );
+
+    const income =
+        document.getElementById(
+            "statementIncome"
+        );
+
+    const expenses =
+        document.getElementById(
+            "statementExpenses"
+        );
+
+
+    if (name) {
+        name.textContent = fileName;
     }
 
+    if (count) {
+        count.textContent =
+            data.transactions.length;
+    }
+
+    if (income) {
+        income.textContent =
+            formatNaira(data.income);
+    }
+
+    if (expenses) {
+        expenses.textContent =
+            formatNaira(data.expenses);
+    }
 }
 
 
 // ========================================
-// ANALYSIS COMPLETE
+// ERROR
 // ========================================
 
-function showAnalysisComplete(data) {
+function showUploadError() {
 
-    analyzer.innerHTML = `
+    analyzingState.style.display = "none";
+    completeState.style.display = "none";
+    uploadState.style.display = "block";
 
-        <div class="statement-complete">
+    const title =
+        uploadState.querySelector("h2");
 
-            <div class="complete-icon">
-                ✓
-            </div>
+    const message =
+        uploadState.querySelector("p");
 
-            <h2>Analysis complete</h2>
 
-            <p>
-                Your financial dashboard has been updated.
-            </p>
+    if (title) {
+        title.textContent =
+            "Couldn't analyze statement";
+    }
 
-            <div class="statement-stats">
+    if (message) {
+        message.textContent =
+            "Make sure your statement is a supported CSV, XLSX, XLS, or PDF file.";
+    }
 
-                <div>
-                    <strong>
-                        ${data.transactions.length}
-                    </strong>
-                    <span>Transactions</span>
-                </div>
 
-                <div>
-                    <strong>
-                        ${formatNaira(data.income)}
-                    </strong>
-                    <span>Income</span>
-                </div>
+    setTimeout(() => {
 
-                <div>
-                    <strong>
-                        ${formatNaira(data.expenses)}
-                    </strong>
-                    <span>Expenses</span>
-                </div>
+        if (title) {
+            title.textContent =
+                "Upload Bank Statement";
+        }
 
-            </div>
+        if (message) {
+            message.textContent =
+                "Turn your transactions into a clear picture of your finances.";
+        }
 
-            <button
-                class="analyze-another"
-                onclick="location.reload()"
-            >
-                Analyze Another Statement
-            </button>
-
-        </div>
-
-    `;
-
+    }, 5000);
 }
 
 
 // ========================================
-// FORMAT CURRENCY
+// FORMAT NAIRA
 // ========================================
 
 function formatNaira(value) {
@@ -666,7 +719,6 @@ function formatNaira(value) {
                 maximumFractionDigits: 2
             }
         );
-
 }
 
 
@@ -682,7 +734,6 @@ function escapeHTML(value) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
-
 }
 
 
@@ -710,9 +761,7 @@ function loadXLSX() {
         script.onerror = reject;
 
         document.head.appendChild(script);
-
     });
-
 }
 
 
@@ -734,35 +783,30 @@ function loadPDFJS() {
             document.createElement("script");
 
         script.src =
-            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
 
-        script.type = "module";
+        script.onload = () => {
 
+            if (window.pdfjsLib) {
 
-        script.onload = async () => {
-
-            try {
-
-                window.pdfjsLib =
-                    await import(script.src);
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
                 resolve();
 
-            } catch (error) {
+            } else {
 
-                reject(error);
+                reject(
+                    new Error("PDF.js failed to load")
+                );
 
             }
-
         };
-
 
         script.onerror = reject;
 
         document.head.appendChild(script);
-
     });
-
 }
 
 
@@ -827,11 +871,8 @@ if (marketToggle) {
             marketData.style.display = "none";
 
             stopMarket();
-
         }
-
     });
-
 }
 
 
@@ -840,14 +881,10 @@ if (marketToggle) {
 // ========================================
 
 let marketPoints = [
-    48, 46, 47, 44, 45,
-    42, 43, 40, 42, 39,
-    41, 37, 38, 35, 36,
-    33, 35, 32, 34, 31,
-    33, 29, 31, 28, 30,
-    27, 29, 25, 27, 24,
-    26, 22, 25, 21, 23,
-    19, 22, 18, 20, 17
+    48,46,47,44,45,42,43,40,42,39,
+    41,37,38,35,36,33,35,32,34,31,
+    33,29,31,28,30,27,29,25,27,24,
+    26,22,25,21,23,19,22,18,20,17
 ];
 
 
@@ -869,37 +906,27 @@ function drawFinancialChart() {
         window.devicePixelRatio || 1;
 
 
-    canvas.width =
-        width * dpr;
-
-    canvas.height =
-        height * dpr;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
 
 
     const ctx =
         canvas.getContext("2d");
 
+
     ctx.setTransform(
-        dpr,
-        0,
-        0,
-        dpr,
-        0,
-        0
+        dpr, 0, 0, dpr, 0, 0
     );
 
-
     ctx.clearRect(
-        0,
-        0,
-        width,
-        height
+        0, 0, width, height
     );
 
 
     // Grid
+
     ctx.strokeStyle =
-        "rgba(255,255,255,0.055)";
+        "rgba(255,255,255,.055)";
 
     ctx.lineWidth = 1;
 
@@ -915,7 +942,6 @@ function drawFinancialChart() {
         ctx.lineTo(width, y);
 
         ctx.stroke();
-
     }
 
 
@@ -980,13 +1006,12 @@ function drawFinancialChart() {
                 next.x,
                 next.y
             );
-
         }
-
     }
 
 
     // Area
+
     spline();
 
     ctx.lineTo(width, height);
@@ -996,10 +1021,7 @@ function drawFinancialChart() {
 
     const gradient =
         ctx.createLinearGradient(
-            0,
-            0,
-            0,
-            height
+            0, 0, 0, height
         );
 
     gradient.addColorStop(
@@ -1017,6 +1039,7 @@ function drawFinancialChart() {
 
 
     // Glow
+
     spline();
 
     ctx.strokeStyle =
@@ -1035,6 +1058,7 @@ function drawFinancialChart() {
 
 
     // Main line
+
     spline();
 
     ctx.shadowBlur = 0;
@@ -1048,6 +1072,7 @@ function drawFinancialChart() {
 
 
     // Last point
+
     const last =
         points[points.length - 1];
 
@@ -1061,15 +1086,18 @@ function drawFinancialChart() {
         Math.PI * 2
     );
 
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#fff";
 
     ctx.shadowBlur = 12;
     ctx.shadowColor = "#bda8ff";
 
     ctx.fill();
-
 }
 
+
+// ========================================
+// MARKET NUMBERS
+// ========================================
 
 function startMarketNumbers() {
 
@@ -1089,80 +1117,80 @@ function startMarketNumbers() {
     let currentPrice = 1530;
 
 
-    priceTimer =
-        setInterval(() => {
+    priceTimer = setInterval(() => {
 
-            currentPrice +=
-                (Math.random() - .46) * 2;
-
-
-            price.textContent =
-                "₦" +
-                currentPrice.toLocaleString(
-                    "en-NG",
-                    {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    }
-                );
+        currentPrice +=
+            (Math.random() - .46) * 2;
 
 
-            change.textContent =
-                "+" +
-                (
-                    Math.random() * .7 +
-                    .1
-                ).toFixed(2) +
-                "%";
-
-
-            const last =
-                marketPoints[
-                    marketPoints.length - 1
-                ];
-
-
-            marketPoints.push(
-                last +
-                (Math.random() - .47) * 5
+        price.textContent =
+            "₦" +
+            currentPrice.toLocaleString(
+                "en-NG",
+                {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
             );
 
 
-            if (marketPoints.length > 42) {
-                marketPoints.shift();
-            }
+        change.textContent =
+            "+" +
+            (
+                Math.random() * .7 + .1
+            ).toFixed(2) +
+            "%";
 
 
-            drawFinancialChart();
+        const last =
+            marketPoints[
+                marketPoints.length - 1
+            ];
 
-        }, 3000);
 
+        marketPoints.push(
+            last +
+            (Math.random() - .47) * 5
+        );
+
+
+        if (marketPoints.length > 42) {
+            marketPoints.shift();
+        }
+
+
+        drawFinancialChart();
+
+    }, 3000);
 }
 
+
+// ========================================
+// STOP MARKET
+// ========================================
 
 function stopMarket() {
 
     clearInterval(priceTimer);
 
     priceTimer = null;
-
 }
 
 
-window.addEventListener(
-    "resize",
-    () => {
+// ========================================
+// RESIZE
+// ========================================
 
-        clearTimeout(resizeTimer);
+window.addEventListener("resize", () => {
 
-        resizeTimer =
-            setTimeout(() => {
+    clearTimeout(resizeTimer);
 
-                if (marketOpen) {
-                    drawFinancialChart();
-                }
+    resizeTimer = setTimeout(() => {
 
-            }, 150);
+        if (marketOpen) {
+            drawFinancialChart();
+        }
 
-    }
-);
+    }, 150);
+
+});
