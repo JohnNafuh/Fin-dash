@@ -244,46 +244,77 @@
 
     <!-- LIVE MARKET BAR -->
 
-    <div class="market-wrapper">
+    <!-- LIVE MARKET BAR -->
 
-        <div class="market-bar">
+<div class="market-wrapper">
 
-            <div class="market-content">
+    <div class="market-header">
+        <div>
+            <span class="live-dot"></span>
+            <span>LIVE MARKET</span>
+        </div>
 
-                <span class="live">
-                    ● LIVE
-                </span>
+        <button id="marketToggle">⌃</button>
+    </div>
 
-                <span>
-                    USD/NGN ₦1,530.00
-                    <strong>▲ 0.42%</strong>
-                </span>
+    <div class="market-loading" id="marketLoading">
 
-                <span>
-                    BTC $113,420
-                    <strong>▲ 1.24%</strong>
-                </span>
+        <div class="rings">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
 
-                <span>
-                    GOLD $3,420
-                    <strong>▼ 0.18%</strong>
-                </span>
+        <p>Loading market data...</p>
 
-                <span>
-                    S&amp;P 500 6,420
-                    <strong>▲ 0.31%</strong>
-                </span>
+    </div>
 
-                <span>
-                    NASDAQ 21,580
-                    <strong>▲ 0.56%</strong>
-                </span>
 
+    <div class="market-data" id="marketData">
+
+        <div class="market-info">
+
+            <div>
+                <span>USD / NGN</span>
+                <strong id="usdPrice">₦1,530.00</strong>
+            </div>
+
+            <div class="market-change positive" id="usdChange">
+                +0.42%
+            </div>
+
+        </div>
+
+
+        <div class="chart-container">
+
+            <canvas id="marketChart"></canvas>
+
+        </div>
+
+
+        <div class="market-assets">
+
+            <div>
+                <span>BTC</span>
+                <strong>$113,420</strong>
+            </div>
+
+            <div>
+                <span>GOLD</span>
+                <strong>$3,420</strong>
+            </div>
+
+            <div>
+                <span>S&amp;P 500</span>
+                <strong>6,420</strong>
             </div>
 
         </div>
 
     </div>
+
+</div>
 
 
     <!-- FOOTER -->
