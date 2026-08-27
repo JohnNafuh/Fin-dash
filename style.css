@@ -9,10 +9,19 @@ body {
     background: #f5f6fa;
     color: #171717;
     padding: 20px;
+    padding-bottom: 90px;
 }
 
+main {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* HEADER */
+
 header {
-    margin-bottom: 25px;
+    max-width: 600px;
+    margin: 0 auto 25px;
 }
 
 header h1 {
@@ -25,28 +34,30 @@ header p {
     font-size: 14px;
 }
 
-main {
-    max-width: 600px;
-    margin: 0 auto;
-}
+
+/* BALANCE */
 
 .balance {
     background: #171717;
     color: white;
     padding: 25px;
-    border-radius: 18px;
+    border-radius: 20px;
     margin-bottom: 18px;
 }
 
 .balance p {
-    font-size: 14px;
-    opacity: 0.7;
+    font-size: 13px;
+    opacity: 0.65;
     margin-bottom: 10px;
 }
 
 .balance h2 {
-    font-size: 36px;
+    font-size: 38px;
+    letter-spacing: -1px;
 }
+
+
+/* SUMMARY */
 
 .summary {
     display: grid;
@@ -57,19 +68,26 @@ main {
 
 .card {
     background: white;
-    padding: 16px 12px;
-    border-radius: 15px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+    padding: 17px 13px;
+    border-radius: 16px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
 }
 
 .card p {
     font-size: 12px;
     color: #777;
-    margin-bottom: 8px;
+    margin-bottom: 9px;
 }
 
 .card h3 {
     font-size: 16px;
+}
+
+
+/* GENERAL SECTIONS */
+
+section {
+    margin-bottom: 30px;
 }
 
 .section-title {
@@ -83,6 +101,11 @@ main {
     font-size: 20px;
 }
 
+.section-title span {
+    font-size: 12px;
+    color: #888;
+}
+
 .section-title button {
     border: none;
     background: none;
@@ -91,17 +114,312 @@ main {
     cursor: pointer;
 }
 
-.empty {
+
+/* QUICK ACTIONS */
+
+.quick-actions h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+}
+
+.action-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.action {
+    border: none;
+    padding: 14px 5px;
+    border-radius: 14px;
     background: white;
-    padding: 30px 20px;
-    border-radius: 15px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+}
+
+.action:active {
+    transform: scale(0.97);
+}
+
+
+/* TRANSACTIONS */
+
+.transaction-list {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.transaction {
+    padding: 25px 20px;
+}
+
+.empty-transaction {
     text-align: center;
     color: #888;
+    font-size: 14px;
 }
+
+
+/* SPENDING */
+
+.spending {
+    background: white;
+    padding: 20px;
+    border-radius: 18px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+}
+
+.spending-item {
+    margin-bottom: 20px;
+}
+
+.spending-item:last-child {
+    margin-bottom: 0;
+}
+
+.spending-item > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.spending-item p {
+    font-size: 14px;
+}
+
+.spending-item span {
+    font-size: 13px;
+    color: #777;
+}
+
+.progress {
+    width: 100%;
+    height: 7px;
+    background: #eeeeee;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 20px;
+}
+
+
+/* BUDGET */
+
+.budget {
+    background: white;
+    padding: 20px;
+    border-radius: 18px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+}
+
+.budget-amount {
+    margin-bottom: 15px;
+}
+
+.budget-amount h3 {
+    font-size: 27px;
+    margin-bottom: 4px;
+}
+
+.budget-amount p {
+    font-size: 13px;
+    color: #888;
+}
+
+.budget-progress {
+    height: 9px;
+    background: #eeeeee;
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.budget-progress-bar {
+    width: 0%;
+    height: 100%;
+    border-radius: 20px;
+}
+
+.budget-message {
+    color: #888;
+    font-size: 12px;
+}
+
+
+/* SAVINGS GOAL */
+
+.goal {
+    background: white;
+    padding: 20px;
+    border-radius: 18px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+}
+
+.goal-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.goal-content p {
+    color: #777;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.goal-content h3 {
+    font-size: 25px;
+    margin-bottom: 3px;
+}
+
+.goal-content span {
+    font-size: 12px;
+    color: #888;
+}
+
+.goal-circle {
+    width: 75px;
+    height: 75px;
+    border-radius: 50%;
+    border: 7px solid #eeeeee;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.goal-circle span {
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+}
+
+
+/* INSIGHTS */
+
+.insight-card {
+    background: white;
+    padding: 18px;
+    border-radius: 18px;
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.04);
+}
+
+.insight-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.insight-card h3 {
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+
+.insight-card p {
+    color: #777;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+
+/* LIVE MARKET BAR */
+
+.market-wrapper {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #171717;
+    color: white;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.market-bar {
+    width: 100%;
+    overflow: hidden;
+}
+
+.market-content {
+    display: flex;
+    gap: 35px;
+    width: max-content;
+    padding: 13px 20px;
+    animation: ticker 25s linear infinite;
+    white-space: nowrap;
+}
+
+.market-content span {
+    font-size: 12px;
+}
+
+.market-content strong {
+    margin-left: 5px;
+    font-weight: 600;
+}
+
+.live {
+    font-weight: bold;
+}
+
+@keyframes ticker {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+
+/* FOOTER */
 
 footer {
     text-align: center;
     margin-top: 50px;
     color: #999;
     font-size: 12px;
+}
+
+
+/* MOBILE */
+
+@media (max-width: 400px) {
+
+    body {
+        padding: 15px;
+        padding-bottom: 80px;
+    }
+
+    .balance h2 {
+        font-size: 32px;
+    }
+
+    .card {
+        padding: 15px 10px;
+    }
+
+    .card h3 {
+        font-size: 14px;
+    }
+
+    .action {
+        font-size: 12px;
+    }
+
 }
