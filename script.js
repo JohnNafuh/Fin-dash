@@ -1,11 +1,6 @@
 // ========================================
 // FIN-DASH
-// STATEMENT ANALYZER + LIVE MARKET
-// ========================================
-
-
-// ========================================
-// STATEMENT ANALYZER
+// BANK STATEMENT ANALYZER + LIVE MARKET
 // ========================================
 
 const analyzer = document.querySelector(".statement-analyzer");
@@ -31,14 +26,12 @@ if (uploadButton && statementInput) {
 
         const file = statementInput.files[0];
 
-        if (!file) return;
+        if (file) startAnalysis(file);
 
-        startAnalysis(file);
     });
 }
 
 
-// Analyze another statement
 document.getElementById("analyzeAnother")?.addEventListener("click", () => {
 
     statementInput.value = "";
@@ -60,19 +53,11 @@ function startAnalysis(file) {
     completeState.style.display = "none";
     analyzingState.style.display = "flex";
 
-    const fileName =
-        document.getElementById("analyzingFileName");
+    const fileName = document.getElementById("analyzingFileName");
+    const progress = document.getElementById("analysisProgressBar");
 
-    const progress =
-        document.getElementById("analysisProgressBar");
-
-    if (fileName) {
-        fileName.textContent = file.name;
-    }
-
-    if (progress) {
-        progress.style.width = "0%";
-    }
+    if (fileName) fileName.textContent = file.name;
+    if (progress) progress.style.width = "0%";
 
     let value = 0;
 
@@ -94,9 +79,7 @@ function startAnalysis(file) {
 
             clearInterval(loading);
 
-            if (progress) {
-                progress.style.width = "100%";
-            }
+            if (progress) progress.style.width = "100%";
 
             setTimeout(() => {
 
@@ -128,10 +111,7 @@ async function analyzeStatement(file) {
         file.name.split(".").pop().toLowerCase();
 
     if (extension === "csv") {
-
-        const text = await file.text();
-
-        return parseCSV(text);
+        return parseCSV(await file.text());
     }
 
     if (extension === "xlsx" || extension === "xls") {
@@ -166,22 +146,18 @@ async function analyzeStatement(file) {
                 data: buffer
             }).promise;
 
-        let text = "";
+        const pages = [];
 
         for (let i = 1; i <= pdf.numPages; i++) {
 
             const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
 
-            const content =
-                await page.getTextContent();
+            pages.push(content.items);
 
-            text +=
-                content.items
-                    .map(item => item.str)
-                    .join(" ") + "\n";
         }
 
-        return parsePDFText(text);
+        return parseKudaPDF(pages);
     }
 
     throw new Error("Unsupported file type");
@@ -189,7 +165,7 @@ async function analyzeStatement(file) {
 
 
 // ========================================
-// CSV PARSER
+// CSV
 // ========================================
 
 function parseCSV(text) {
@@ -210,14 +186,12 @@ function parseCSV(text) {
 
 
 // ========================================
-// ROW PARSER
+// CSV / XLSX ROW PARSER
 // ========================================
 
 function parseRows(rows) {
 
-    if (!rows.length) {
-        return emptyData();
-    }
+    if (!rows.length) return emptyData();
 
     const headers =
         rows[0].map(h =>
@@ -239,28 +213,19 @@ function parseRows(rows) {
         );
 
     const amountIndex =
-        findColumn(
-            "amount",
-            "value"
-        );
+        findColumn("amount", "value");
 
     const typeIndex =
-        findColumn(
-            "type",
-            "transaction type"
-        );
+        findColumn("type", "transaction");
 
     const creditIndex =
-        findColumn(
-            "credit",
-            "deposit"
-        );
+        findColumn("credit", "deposit");
 
     const debitIndex =
-        findColumn(
-            "debit",
-            "withdraw"
-        );
+        findColumn("debit", "withdraw");
+
+    const dateIndex =
+        findColumn("date", "transaction date");
 
     const transactions = [];
 
@@ -274,8 +239,7 @@ function parseRows(rows) {
         const description =
             descriptionIndex >= 0
                 ? String(row[descriptionIndex] || "")
-                : row.join(" ");
-
+                : "";
 
         let amount = 0;
         let type = "";
@@ -286,49 +250,55 @@ function parseRows(rows) {
             String(row[creditIndex]).trim()
         ) {
 
-            amount =
-                parseMoney(row[creditIndex]);
+            amount = Math.abs(
+                parseMoney(row[creditIndex])
+            );
 
-            type = "credit";
+            type = "income";
 
         } else if (
             debitIndex >= 0 &&
             String(row[debitIndex]).trim()
         ) {
 
-            amount =
-                parseMoney(row[debitIndex]);
+            amount = Math.abs(
+                parseMoney(row[debitIndex])
+            );
 
-            type = "debit";
+            type = "expense";
 
         } else if (amountIndex >= 0) {
 
-            amount =
+            const raw =
                 parseMoney(row[amountIndex]);
 
+            amount = Math.abs(raw);
+
             type =
-                typeIndex >= 0
-                    ? String(row[typeIndex] || "").toLowerCase()
-                    : "";
+                detectType(
+                    typeIndex >= 0
+                        ? String(row[typeIndex] || "")
+                        : "",
+                    description,
+                    raw
+                );
         }
 
 
-        if (!amount) continue;
-
+        if (!amount || !description) continue;
 
         transactions.push({
-
+            date:
+                dateIndex >= 0
+                    ? String(row[dateIndex] || "")
+                    : "",
             description,
-
-            amount: Math.abs(amount),
-
-            type:
-                detectType(
-                    type,
-                    description,
-                    amount
-                )
-
+            amount,
+            type,
+            category:
+                type === "expense"
+                    ? categorize(description)
+                    : "Income"
         });
     }
 
@@ -338,62 +308,264 @@ function parseRows(rows) {
 
 
 // ========================================
-// PDF PARSER
+// KUDA PDF PARSER
 // ========================================
 
-function parsePDFText(text) {
+function parseKudaPDF(pages) {
 
     const transactions = [];
 
-    const lines =
-        text
-            .split(/\r?\n/)
-            .map(line => line.trim())
-            .filter(Boolean);
+    for (const items of pages) {
 
+        const rows = buildPDFRows(items);
 
-    for (const line of lines) {
+        for (const row of rows) {
 
-        const numbers =
-            line.match(
-                /(?:₦|\$|£)?\s?-?[\d,]+(?:\.\d{2})?/g
-            );
+            const transaction =
+                parseKudaRow(row);
 
-        if (!numbers) continue;
-
-
-        const rawAmount =
-            numbers[numbers.length - 1];
-
-        const amount =
-            parseMoney(rawAmount);
-
-        if (!amount) continue;
-
-
-        transactions.push({
-
-            description: line,
-
-            amount: Math.abs(amount),
-
-            type:
-                detectType(
-                    "",
-                    line,
-                    amount
-                )
-
-        });
+            if (transaction) {
+                transactions.push(transaction);
+            }
+        }
     }
 
 
-    return calculateFinancials(transactions);
+    // Remove duplicate transactions
+    const unique = [];
+
+    const seen = new Set();
+
+    transactions.forEach(transaction => {
+
+        const key =
+            [
+                transaction.date,
+                transaction.description,
+                transaction.amount,
+                transaction.type
+            ].join("|");
+
+        if (!seen.has(key)) {
+
+            seen.add(key);
+            unique.push(transaction);
+
+        }
+
+    });
+
+
+    return calculateFinancials(unique);
 }
 
 
 // ========================================
-// DETECT TRANSACTION TYPE
+// REBUILD PDF TEXT INTO REAL ROWS
+// ========================================
+
+function buildPDFRows(items) {
+
+    const sorted =
+        items
+            .filter(item => item.str && item.str.trim())
+            .map(item => ({
+                text: item.str.trim(),
+                x: item.transform[4],
+                y: item.transform[5]
+            }))
+            .sort((a, b) => b.y - a.y || a.x - b.x);
+
+
+    const rows = [];
+
+    const tolerance = 3;
+
+
+    sorted.forEach(item => {
+
+        let row =
+            rows.find(r =>
+                Math.abs(r.y - item.y) <= tolerance
+            );
+
+
+        if (!row) {
+
+            row = {
+                y: item.y,
+                items: []
+            };
+
+            rows.push(row);
+        }
+
+        row.items.push(item);
+
+    });
+
+
+    return rows
+        .sort((a, b) => b.y - a.y)
+        .map(row =>
+            row.items
+                .sort((a, b) => a.x - b.x)
+                .map(item => item.text)
+        );
+}
+
+
+// ========================================
+// PARSE KUDA ROW
+// ========================================
+
+function parseKudaRow(row) {
+
+    const text = row.join(" ").replace(/\s+/g, " ").trim();
+
+    if (!text) return null;
+
+
+    // Must contain a recognizable date.
+    const dateMatch =
+        text.match(
+            /\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})\b/
+        );
+
+
+    if (!dateMatch) return null;
+
+
+    // Ignore obvious statement headings / summaries.
+    const lower = text.toLowerCase();
+
+    const ignored =
+        [
+            "opening balance",
+            "closing balance",
+            "available balance",
+            "statement period",
+            "account number",
+            "account name",
+            "total credits",
+            "total debits",
+            "transaction history",
+            "transaction date",
+            "description",
+            "debit",
+            "credit",
+            "balance"
+        ];
+
+
+    if (
+        ignored.some(word =>
+            lower.includes(word)
+        )
+    ) {
+        return null;
+    }
+
+
+    const date = dateMatch[0];
+
+    const afterDate =
+        text
+            .slice(
+                dateMatch.index +
+                date.length
+            )
+            .trim();
+
+
+    /*
+     * Find money values.
+     * We take the final meaningful amount(s)
+     * rather than treating every number as a transaction.
+     */
+
+    const amounts =
+        afterDate.match(
+            /(?:₦|NGN)?\s?-?\d[\d,]*(?:\.\d{2})?/g
+        );
+
+
+    if (!amounts || !amounts.length) {
+        return null;
+    }
+
+
+    const values =
+        amounts
+            .map(parseMoney)
+            .filter(v => Math.abs(v) > 0);
+
+
+    if (!values.length) return null;
+
+
+    /*
+     * Kuda rows commonly contain description,
+     * debit/credit and balance.
+     *
+     * The last number is usually balance,
+     * so use the previous amount when possible.
+     */
+
+    let amount;
+
+    if (values.length >= 2) {
+        amount = Math.abs(values[values.length - 2]);
+    } else {
+        amount = Math.abs(values[0]);
+    }
+
+
+    if (!amount) return null;
+
+
+    let description =
+        afterDate
+            .replace(
+                /(?:₦|NGN)?\s?-?\d[\d,]*(?:\.\d{2})?/g,
+                ""
+            )
+            .replace(/\s+/g, " ")
+            .trim();
+
+
+    if (!description) return null;
+
+
+    const type =
+        detectType(
+            "",
+            description,
+            afterDate
+        );
+
+
+    return {
+
+        date,
+
+        description,
+
+        amount,
+
+        type,
+
+        category:
+            type === "expense"
+                ? categorize(description)
+                : "Income"
+
+    };
+}
+
+
+// ========================================
+// TRANSACTION TYPE
 // ========================================
 
 function detectType(type, description, amount) {
@@ -413,7 +585,9 @@ function detectType(type, description, amount) {
         value.includes("income") ||
         value.includes("refund") ||
         value.includes("received") ||
-        value.includes("inflow")
+        value.includes("inflow") ||
+        value.includes("money received") ||
+        value.includes("cashback")
     ) {
         return "income";
     }
@@ -426,8 +600,16 @@ function detectType(type, description, amount) {
         value.includes("purchase") ||
         value.includes("pos") ||
         value.includes("transfer to") ||
-        value.includes("outflow")
+        value.includes("sent") ||
+        value.includes("outflow") ||
+        value.includes("airtime") ||
+        value.includes("data")
     ) {
+        return "expense";
+    }
+
+
+    if (typeof amount === "number" && amount < 0) {
         return "expense";
     }
 
@@ -437,7 +619,77 @@ function detectType(type, description, amount) {
 
 
 // ========================================
-// CALCULATE FINANCIALS
+// EXPENSE CATEGORIES
+// ========================================
+
+function categorize(description) {
+
+    const text =
+        String(description).toLowerCase();
+
+
+    if (
+        /food|restaurant|eatery|meal|pizza|chicken|burger|suya|groceries|market|supermarket|kuda food/i
+            .test(text)
+    ) {
+        return "Food";
+    }
+
+
+    if (
+        /uber|bolt|taxi|transport|bus|fuel|petrol|diesel|parking|ride/i
+            .test(text)
+    ) {
+        return "Transport";
+    }
+
+
+    if (
+        /electric|power|phcn|aedc|water|internet|wifi|subscription|netflix|dstv|gotv|bill|utility/i
+            .test(text)
+    ) {
+        return "Bills";
+    }
+
+
+    if (
+        /movie|cinema|spotify|music|game|gaming|concert|entertainment|club/i
+            .test(text)
+    ) {
+        return "Entertainment";
+    }
+
+
+    if (
+        /shop|shopping|jumia|amazon|clothing|fashion|store|purchase/i
+            .test(text)
+    ) {
+        return "Shopping";
+    }
+
+
+    if (
+        /airtime|data|mtn|airtel|glo|9mobile/i
+            .test(text)
+    ) {
+        return "Bills";
+    }
+
+
+    if (
+        /transfer|bank|fee|charge|commission|stamp duty/i
+            .test(text)
+    ) {
+        return "Other";
+    }
+
+
+    return "Other";
+}
+
+
+// ========================================
+// FINANCIAL CALCULATIONS
 // ========================================
 
 function calculateFinancials(transactions) {
@@ -445,13 +697,31 @@ function calculateFinancials(transactions) {
     let income = 0;
     let expenses = 0;
 
+    const categories = {
+        Food: 0,
+        Transport: 0,
+        Bills: 0,
+        Entertainment: 0,
+        Shopping: 0,
+        Other: 0
+    };
+
 
     transactions.forEach(transaction => {
 
         if (transaction.type === "income") {
+
             income += transaction.amount;
+
         } else {
+
             expenses += transaction.amount;
+
+            if (categories[transaction.category] !== undefined) {
+                categories[transaction.category] +=
+                    transaction.amount;
+            }
+
         }
 
     });
@@ -469,7 +739,9 @@ function calculateFinancials(transactions) {
             income - expenses,
 
         balance:
-            income - expenses
+            income - expenses,
+
+        categories
 
     };
 }
@@ -487,14 +759,23 @@ function emptyData() {
 
         savings: 0,
 
-        balance: 0
+        balance: 0,
+
+        categories: {
+            Food: 0,
+            Transport: 0,
+            Bills: 0,
+            Entertainment: 0,
+            Shopping: 0,
+            Other: 0
+        }
 
     };
 }
 
 
 // ========================================
-// MONEY
+// MONEY PARSER
 // ========================================
 
 function parseMoney(value) {
@@ -520,15 +801,13 @@ function parseMoney(value) {
     const number =
         parseFloat(
             raw.replace(
-                /[₦$£,\s()]/g,
+                /[₦$£NGN,\s()]/gi,
                 ""
             )
         );
 
 
-    if (isNaN(number)) {
-        return 0;
-    }
+    if (isNaN(number)) return 0;
 
 
     return negative
@@ -543,19 +822,21 @@ function parseMoney(value) {
 
 function updateDashboard(data) {
 
+    // Balance
     const balance =
         document.querySelector(".balance h2");
-
-    const cards =
-        document.querySelectorAll(
-            ".summary .card h3"
-        );
-
 
     if (balance) {
         balance.textContent =
             formatNaira(data.balance);
     }
+
+
+    // Summary
+    const cards =
+        document.querySelectorAll(
+            ".summary .card h3"
+        );
 
 
     if (cards.length >= 3) {
@@ -568,8 +849,25 @@ function updateDashboard(data) {
 
         cards[2].textContent =
             formatNaira(data.savings);
+
     }
 
+
+    updateTransactions(data.transactions);
+
+    updateSpending(data);
+
+    updateBudget(data);
+
+    updateInsights(data);
+}
+
+
+// ========================================
+// RECENT TRANSACTIONS
+// ========================================
+
+function updateTransactions(transactions) {
 
     const list =
         document.querySelector(
@@ -577,35 +875,275 @@ function updateDashboard(data) {
         );
 
 
-    if (list && data.transactions.length) {
+    if (!list) return;
 
-        list.innerHTML =
-            data.transactions
-                .slice(-8)
-                .reverse()
-                .map(transaction => `
 
-                    <div class="transaction">
+    if (!transactions.length) {
 
-                        <div>
-                            <strong>
-                                ${escapeHTML(
-                                    transaction.description
-                                )}
-                            </strong>
-                        </div>
+        list.innerHTML = `
+            <div class="transaction empty-transaction">
+                <p>No transactions found.</p>
+            </div>
+        `;
+
+        return;
+    }
+
+
+    list.innerHTML =
+        transactions
+            .slice(-8)
+            .reverse()
+            .map(transaction => `
+
+                <div class="transaction">
+
+                    <div>
 
                         <strong>
-                            ${transaction.type === "income" ? "+" : "-"}
-                            ${formatNaira(
-                                transaction.amount
+                            ${escapeHTML(
+                                cleanDescription(
+                                    transaction.description
+                                )
                             )}
                         </strong>
 
+                        <small>
+                            ${escapeHTML(
+                                transaction.date || ""
+                            )}
+                        </small>
+
                     </div>
 
-                `)
-                .join("");
+                    <strong class="${transaction.type}">
+
+                        ${transaction.type === "income" ? "+" : "-"}
+
+                        ${formatNaira(
+                            transaction.amount
+                        )}
+
+                    </strong>
+
+                </div>
+
+            `)
+            .join("");
+}
+
+
+function cleanDescription(description) {
+
+    return String(description)
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 90);
+}
+
+
+// ========================================
+// SPENDING OVERVIEW
+// ========================================
+
+function updateSpending(data) {
+
+    const spending =
+        document.querySelector(".spending");
+
+    if (!spending) return;
+
+
+    const items =
+        spending.querySelectorAll(
+            ".spending-item"
+        );
+
+
+    const categories = [
+        "Food",
+        "Transport",
+        "Bills",
+        "Entertainment"
+    ];
+
+
+    const max =
+        Math.max(
+            ...categories.map(
+                category =>
+                    data.categories[category] || 0
+            ),
+            1
+        );
+
+
+    items.forEach((item, index) => {
+
+        const category =
+            categories[index];
+
+        if (!category) return;
+
+
+        const amount =
+            data.categories[category] || 0;
+
+
+        const value =
+            item.querySelector(
+                "div:first-child span"
+            );
+
+        const bar =
+            item.querySelector(
+                ".progress-bar"
+            );
+
+
+        if (value) {
+            value.textContent =
+                formatNaira(amount);
+        }
+
+
+        if (bar) {
+
+            bar.style.width =
+                (
+                    amount / max * 100
+                ) + "%";
+
+        }
+
+    });
+}
+
+
+// ========================================
+// MONTHLY BUDGET
+// ========================================
+
+function updateBudget(data) {
+
+    const budget =
+        document.querySelector(".budget");
+
+    if (!budget) return;
+
+
+    const amount =
+        budget.querySelector(
+            ".budget-amount h3"
+        );
+
+    const subtitle =
+        budget.querySelector(
+            ".budget-amount p"
+        );
+
+    const message =
+        budget.querySelector(
+            ".budget-message"
+        );
+
+    const progress =
+        budget.querySelector(
+            ".budget-progress-bar"
+        );
+
+
+    if (amount) {
+        amount.textContent =
+            formatNaira(data.expenses);
+    }
+
+
+    if (subtitle) {
+        subtitle.textContent =
+            `of ${formatNaira(data.expenses)} spent`;
+    }
+
+
+    if (progress) {
+        progress.style.width =
+            data.expenses > 0
+                ? "100%"
+                : "0%";
+    }
+
+
+    if (message) {
+
+        if (data.expenses > 0) {
+
+            message.textContent =
+                `${data.transactions.length} transactions analyzed.`;
+
+        } else {
+
+            message.textContent =
+                "No expenses found in this statement.";
+
+        }
+
+    }
+}
+
+
+// ========================================
+// FINANCIAL INSIGHTS
+// ========================================
+
+function updateInsights(data) {
+
+    const card =
+        document.querySelector(".insight-card");
+
+    if (!card) return;
+
+
+    const title =
+        card.querySelector("h3");
+
+    const text =
+        card.querySelector("p");
+
+
+    if (!title || !text) return;
+
+
+    const biggest =
+        Object.entries(data.categories)
+            .sort((a, b) => b[1] - a[1])[0];
+
+
+    if (!data.transactions.length) {
+
+        title.textContent =
+            "No transactions found";
+
+        text.textContent =
+            "Try another statement or check that the statement contains transaction records.";
+
+        return;
+    }
+
+
+    title.textContent =
+        "Your finances have been analyzed";
+
+
+    if (biggest && biggest[1] > 0) {
+
+        text.textContent =
+            `${biggest[0]} is currently your largest spending category at ${formatNaira(biggest[1])}. You have ${formatNaira(data.savings)} left after recorded income and expenses.`;
+
+    } else {
+
+        text.textContent =
+            `Fin-dash analyzed ${data.transactions.length} transactions with ${formatNaira(data.income)} in income and ${formatNaira(data.expenses)} in expenses.`;
+
     }
 }
 
@@ -618,6 +1156,7 @@ function showComplete(data, fileName) {
 
     analyzingState.style.display = "none";
     completeState.style.display = "flex";
+
 
     const name =
         document.getElementById(
@@ -640,9 +1179,7 @@ function showComplete(data, fileName) {
         );
 
 
-    if (name) {
-        name.textContent = fileName;
-    }
+    if (name) name.textContent = fileName;
 
     if (count) {
         count.textContent =
@@ -671,6 +1208,7 @@ function showUploadError() {
     completeState.style.display = "none";
     uploadState.style.display = "block";
 
+
     const title =
         uploadState.querySelector("h2");
 
@@ -682,6 +1220,7 @@ function showUploadError() {
         title.textContent =
             "Couldn't analyze statement";
     }
+
 
     if (message) {
         message.textContent =
@@ -706,7 +1245,7 @@ function showUploadError() {
 
 
 // ========================================
-// FORMAT NAIRA
+// FORMAT
 // ========================================
 
 function formatNaira(value) {
@@ -738,7 +1277,7 @@ function escapeHTML(value) {
 
 
 // ========================================
-// LOAD XLSX
+// XLSX
 // ========================================
 
 function loadXLSX() {
@@ -761,12 +1300,13 @@ function loadXLSX() {
         script.onerror = reject;
 
         document.head.appendChild(script);
+
     });
 }
 
 
 // ========================================
-// LOAD PDF.JS
+// PDF.JS
 // ========================================
 
 function loadPDFJS() {
@@ -787,25 +1327,25 @@ function loadPDFJS() {
 
         script.onload = () => {
 
-            if (window.pdfjsLib) {
-
-                window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-                    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-                resolve();
-
-            } else {
-
+            if (!window.pdfjsLib) {
                 reject(
                     new Error("PDF.js failed to load")
                 );
-
+                return;
             }
+
+
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+            resolve();
+
         };
 
         script.onerror = reject;
 
         document.head.appendChild(script);
+
     });
 }
 
@@ -871,8 +1411,11 @@ if (marketToggle) {
             marketData.style.display = "none";
 
             stopMarket();
+
         }
+
     });
+
 }
 
 
@@ -915,15 +1458,13 @@ function drawFinancialChart() {
 
 
     ctx.setTransform(
-        dpr, 0, 0, dpr, 0, 0
+        dpr,0,0,dpr,0,0
     );
 
     ctx.clearRect(
-        0, 0, width, height
+        0,0,width,height
     );
 
-
-    // Grid
 
     ctx.strokeStyle =
         "rgba(255,255,255,.055)";
@@ -938,10 +1479,11 @@ function drawFinancialChart() {
 
         ctx.beginPath();
 
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
+        ctx.moveTo(0,y);
+        ctx.lineTo(width,y);
 
         ctx.stroke();
+
     }
 
 
@@ -956,7 +1498,7 @@ function drawFinancialChart() {
 
 
     const points =
-        marketPoints.map((value, index) => ({
+        marketPoints.map((value,index) => ({
 
             x:
                 (index /
@@ -1006,23 +1548,24 @@ function drawFinancialChart() {
                 next.x,
                 next.y
             );
+
         }
+
     }
 
 
-    // Area
-
     spline();
 
-    ctx.lineTo(width, height);
-    ctx.lineTo(0, height);
+    ctx.lineTo(width,height);
+    ctx.lineTo(0,height);
     ctx.closePath();
 
 
     const gradient =
         ctx.createLinearGradient(
-            0, 0, 0, height
+            0,0,0,height
         );
+
 
     gradient.addColorStop(
         0,
@@ -1034,11 +1577,10 @@ function drawFinancialChart() {
         "rgba(108,60,255,0)"
     );
 
+
     ctx.fillStyle = gradient;
     ctx.fill();
 
-
-    // Glow
 
     spline();
 
@@ -1057,8 +1599,6 @@ function drawFinancialChart() {
     ctx.stroke();
 
 
-    // Main line
-
     spline();
 
     ctx.shadowBlur = 0;
@@ -1071,10 +1611,9 @@ function drawFinancialChart() {
     ctx.stroke();
 
 
-    // Last point
-
     const last =
         points[points.length - 1];
+
 
     ctx.beginPath();
 
@@ -1092,6 +1631,7 @@ function drawFinancialChart() {
     ctx.shadowColor = "#bda8ff";
 
     ctx.fill();
+
 }
 
 
@@ -1117,57 +1657,55 @@ function startMarketNumbers() {
     let currentPrice = 1530;
 
 
-    priceTimer = setInterval(() => {
+    priceTimer =
+        setInterval(() => {
 
-        currentPrice +=
-            (Math.random() - .46) * 2;
+            currentPrice +=
+                (Math.random() - .46) * 2;
 
 
-        price.textContent =
-            "₦" +
-            currentPrice.toLocaleString(
-                "en-NG",
-                {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }
+            price.textContent =
+                "₦" +
+                currentPrice.toLocaleString(
+                    "en-NG",
+                    {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }
+                );
+
+
+            change.textContent =
+                "+" +
+                (
+                    Math.random() * .7 + .1
+                ).toFixed(2) +
+                "%";
+
+
+            const last =
+                marketPoints[
+                    marketPoints.length - 1
+                ];
+
+
+            marketPoints.push(
+                last +
+                (Math.random() - .47) * 5
             );
 
 
-        change.textContent =
-            "+" +
-            (
-                Math.random() * .7 + .1
-            ).toFixed(2) +
-            "%";
+            if (marketPoints.length > 42) {
+                marketPoints.shift();
+            }
 
 
-        const last =
-            marketPoints[
-                marketPoints.length - 1
-            ];
+            drawFinancialChart();
 
+        },3000);
 
-        marketPoints.push(
-            last +
-            (Math.random() - .47) * 5
-        );
-
-
-        if (marketPoints.length > 42) {
-            marketPoints.shift();
-        }
-
-
-        drawFinancialChart();
-
-    }, 3000);
 }
 
-
-// ========================================
-// STOP MARKET
-// ========================================
 
 function stopMarket() {
 
@@ -1185,12 +1723,13 @@ window.addEventListener("resize", () => {
 
     clearTimeout(resizeTimer);
 
-    resizeTimer = setTimeout(() => {
+    resizeTimer =
+        setTimeout(() => {
 
-        if (marketOpen) {
-            drawFinancialChart();
-        }
+            if (marketOpen) {
+                drawFinancialChart();
+            }
 
-    }, 150);
+        },150);
 
 });
