@@ -1,6 +1,6 @@
 // ========================================
 // FIN-DASH
-// BANK STATEMENT ANALYZER + LIVE MARKET
+// KUDA STATEMENT ANALYZER + LIVE MARKET
 // ========================================
 
 const analyzer = document.querySelector(".statement-analyzer");
@@ -53,8 +53,11 @@ function startAnalysis(file) {
     completeState.style.display = "none";
     analyzingState.style.display = "flex";
 
-    const fileName = document.getElementById("analyzingFileName");
-    const progress = document.getElementById("analysisProgressBar");
+    const fileName =
+        document.getElementById("analyzingFileName");
+
+    const progress =
+        document.getElementById("analysisProgressBar");
 
     if (fileName) fileName.textContent = file.name;
     if (progress) progress.style.width = "0%";
@@ -63,7 +66,7 @@ function startAnalysis(file) {
 
     const loading = setInterval(() => {
 
-        value += Math.random() * 10;
+        value += Math.random() * 8;
 
         if (value > 90) value = 90;
 
@@ -79,21 +82,23 @@ function startAnalysis(file) {
 
             clearInterval(loading);
 
-            if (progress) progress.style.width = "100%";
+            if (progress) {
+                progress.style.width = "100%";
+            }
 
             setTimeout(() => {
 
                 updateDashboard(data);
                 showComplete(data, file.name);
 
-            }, 600);
+            }, 500);
 
         })
         .catch(error => {
 
             clearInterval(loading);
 
-            console.error("Statement analysis error:", error);
+            console.error("Analysis error:", error);
 
             showUploadError();
 
@@ -110,9 +115,13 @@ async function analyzeStatement(file) {
     const extension =
         file.name.split(".").pop().toLowerCase();
 
+
     if (extension === "csv") {
+
         return parseCSV(await file.text());
+
     }
+
 
     if (extension === "xlsx" || extension === "xls") {
 
@@ -129,38 +138,50 @@ async function analyzeStatement(file) {
         const rows =
             XLSX.utils.sheet_to_json(
                 sheet,
-                { header: 1, defval: "" }
+                {
+                    header: 1,
+                    defval: ""
+                }
             );
 
         return parseRows(rows);
+
     }
+
 
     if (extension === "pdf") {
 
         await loadPDFJS();
 
-        const buffer = await file.arrayBuffer();
+        const buffer =
+            await file.arrayBuffer();
 
         const pdf =
             await pdfjsLib.getDocument({
                 data: buffer
             }).promise;
 
-        const pages = [];
+        let rows = [];
 
-        for (let i = 1; i <= pdf.numPages; i++) {
+        for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
 
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
+            const page =
+                await pdf.getPage(pageNo);
 
-            pages.push(content.items);
+            const content =
+                await page.getTextContent();
 
+            const pageRows =
+                groupPDFItems(content.items);
+
+            rows.push(...pageRows);
         }
 
-        return parseKudaPDF(pages);
+        return parseKudaPDFRows(rows);
     }
 
-    throw new Error("Unsupported file type");
+
+    throw new Error("Unsupported file");
 }
 
 
@@ -170,37 +191,79 @@ async function analyzeStatement(file) {
 
 function parseCSV(text) {
 
-    const rows = text
-        .split(/\r?\n/)
-        .filter(row => row.trim())
-        .map(row =>
-            row.split(",").map(cell =>
-                cell
-                    .replace(/^"|"$/g, "")
-                    .trim()
-            )
-        );
+    const rows =
+        text
+            .split(/\r?\n/)
+            .filter(line => line.trim())
+            .map(line =>
+                line
+                    .split(",")
+                    .map(cell =>
+                        cell
+                            .replace(/^"|"$/g, "")
+                            .trim()
+                    )
+            );
 
     return parseRows(rows);
 }
 
 
 // ========================================
-// CSV / XLSX ROW PARSER
+// XLSX / CSV ROW PARSER
 // ========================================
 
 function parseRows(rows) {
 
     if (!rows.length) return emptyData();
 
+    let headerIndex = -1;
+
+    for (let i = 0; i < Math.min(rows.length, 15); i++) {
+
+        const text =
+            rows[i]
+                .join(" ")
+                .toLowerCase();
+
+        if (
+            text.includes("date") &&
+            (
+                text.includes("description") ||
+                text.includes("narration") ||
+                text.includes("amount") ||
+                text.includes("money out") ||
+                text.includes("money in")
+            )
+        ) {
+            headerIndex = i;
+            break;
+        }
+    }
+
+    if (headerIndex < 0) headerIndex = 0;
+
     const headers =
-        rows[0].map(h =>
-            String(h).toLowerCase().trim()
-        );
+        rows[headerIndex]
+            .map(v =>
+                String(v)
+                    .toLowerCase()
+                    .trim()
+            );
+
 
     const findColumn = (...names) =>
         headers.findIndex(h =>
-            names.some(name => h.includes(name))
+            names.some(name =>
+                h.includes(name)
+            )
+        );
+
+
+    const dateIndex =
+        findColumn(
+            "date",
+            "transaction date"
         );
 
     const descriptionIndex =
@@ -212,94 +275,122 @@ function parseRows(rows) {
             "particular"
         );
 
+    const moneyInIndex =
+        findColumn(
+            "money in",
+            "credit",
+            "deposit",
+            "inflow",
+            "received"
+        );
+
+    const moneyOutIndex =
+        findColumn(
+            "money out",
+            "debit",
+            "withdrawal",
+            "withdraw",
+            "outflow"
+        );
+
     const amountIndex =
-        findColumn("amount", "value");
+        findColumn(
+            "amount",
+            "value"
+        );
 
     const typeIndex =
-        findColumn("type", "transaction");
+        findColumn(
+            "type",
+            "transaction type"
+        );
 
-    const creditIndex =
-        findColumn("credit", "deposit");
-
-    const debitIndex =
-        findColumn("debit", "withdraw");
-
-    const dateIndex =
-        findColumn("date", "transaction date");
 
     const transactions = [];
 
 
-    for (let i = 1; i < rows.length; i++) {
+    for (
+        let i = headerIndex + 1;
+        i < rows.length;
+        i++
+    ) {
 
         const row = rows[i];
 
         if (!row || !row.length) continue;
+
 
         const description =
             descriptionIndex >= 0
                 ? String(row[descriptionIndex] || "")
                 : "";
 
-        let amount = 0;
-        let type = "";
+
+        let moneyIn =
+            moneyInIndex >= 0
+                ? parseMoney(row[moneyInIndex])
+                : 0;
 
 
-        if (
-            creditIndex >= 0 &&
-            String(row[creditIndex]).trim()
-        ) {
+        let moneyOut =
+            moneyOutIndex >= 0
+                ? parseMoney(row[moneyOutIndex])
+                : 0;
 
-            amount = Math.abs(
-                parseMoney(row[creditIndex])
-            );
 
-            type = "income";
+        let amount =
+            amountIndex >= 0
+                ? parseMoney(row[amountIndex])
+                : 0;
 
-        } else if (
-            debitIndex >= 0 &&
-            String(row[debitIndex]).trim()
-        ) {
 
-            amount = Math.abs(
-                parseMoney(row[debitIndex])
-            );
+        let type =
+            typeIndex >= 0
+                ? String(row[typeIndex] || "")
+                : "";
 
-            type = "expense";
 
-        } else if (amountIndex >= 0) {
+        if (moneyIn > 0) {
 
-            const raw =
-                parseMoney(row[amountIndex]);
+            transactions.push({
+                date: dateIndex >= 0 ? row[dateIndex] : "",
+                description: cleanDescription(description),
+                amount: moneyIn,
+                type: "income",
+                category: categorize(description)
+            });
 
-            amount = Math.abs(raw);
-
-            type =
-                detectType(
-                    typeIndex >= 0
-                        ? String(row[typeIndex] || "")
-                        : "",
-                    description,
-                    raw
-                );
+            continue;
         }
 
 
-        if (!amount || !description) continue;
+        if (moneyOut > 0) {
 
-        transactions.push({
-            date:
-                dateIndex >= 0
-                    ? String(row[dateIndex] || "")
-                    : "",
-            description,
-            amount,
-            type,
-            category:
-                type === "expense"
-                    ? categorize(description)
-                    : "Income"
-        });
+            transactions.push({
+                date: dateIndex >= 0 ? row[dateIndex] : "",
+                description: cleanDescription(description),
+                amount: moneyOut,
+                type: "expense",
+                category: categorize(description)
+            });
+
+            continue;
+        }
+
+
+        if (amount !== 0) {
+
+            const income =
+                isIncome(type, description, amount);
+
+            transactions.push({
+                date: dateIndex >= 0 ? row[dateIndex] : "",
+                description: cleanDescription(description),
+                amount: Math.abs(amount),
+                type: income ? "income" : "expense",
+                category: categorize(description)
+            });
+        }
     }
 
 
@@ -308,99 +399,46 @@ function parseRows(rows) {
 
 
 // ========================================
-// KUDA PDF PARSER
+// PDF ROW GROUPING
 // ========================================
 
-function parseKudaPDF(pages) {
-
-    const transactions = [];
-
-    for (const items of pages) {
-
-        const rows = buildPDFRows(items);
-
-        for (const row of rows) {
-
-            const transaction =
-                parseKudaRow(row);
-
-            if (transaction) {
-                transactions.push(transaction);
-            }
-        }
-    }
-
-
-    // Remove duplicate transactions
-    const unique = [];
-
-    const seen = new Set();
-
-    transactions.forEach(transaction => {
-
-        const key =
-            [
-                transaction.date,
-                transaction.description,
-                transaction.amount,
-                transaction.type
-            ].join("|");
-
-        if (!seen.has(key)) {
-
-            seen.add(key);
-            unique.push(transaction);
-
-        }
-
-    });
-
-
-    return calculateFinancials(unique);
-}
-
-
-// ========================================
-// REBUILD PDF TEXT INTO REAL ROWS
-// ========================================
-
-function buildPDFRows(items) {
-
-    const sorted =
-        items
-            .filter(item => item.str && item.str.trim())
-            .map(item => ({
-                text: item.str.trim(),
-                x: item.transform[4],
-                y: item.transform[5]
-            }))
-            .sort((a, b) => b.y - a.y || a.x - b.x);
-
+function groupPDFItems(items) {
 
     const rows = [];
 
-    const tolerance = 3;
+    const tolerance = 4;
 
+    items.forEach(item => {
 
-    sorted.forEach(item => {
+        const text =
+            String(item.str || "").trim();
+
+        if (!text) return;
+
+        const x = item.transform[4];
+        const y = item.transform[5];
 
         let row =
             rows.find(r =>
-                Math.abs(r.y - item.y) <= tolerance
+                Math.abs(r.y - y) <= tolerance
             );
 
 
         if (!row) {
 
             row = {
-                y: item.y,
+                y,
                 items: []
             };
 
             rows.push(row);
         }
 
-        row.items.push(item);
+
+        row.items.push({
+            x,
+            text
+        });
 
     });
 
@@ -416,151 +454,139 @@ function buildPDFRows(items) {
 
 
 // ========================================
-// PARSE KUDA ROW
+// KUDA PDF PARSER
 // ========================================
 
-function parseKudaRow(row) {
+function parseKudaPDFRows(rows) {
 
-    const text = row.join(" ").replace(/\s+/g, " ").trim();
-
-    if (!text) return null;
+    const transactions = [];
 
 
-    // Must contain a recognizable date.
-    const dateMatch =
-        text.match(
-            /\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})\b/
-        );
+    for (const row of rows) {
+
+        const line =
+            row.join(" ").replace(/\s+/g, " ").trim();
 
 
-    if (!dateMatch) return null;
+        if (!line) continue;
 
 
-    // Ignore obvious statement headings / summaries.
-    const lower = text.toLowerCase();
+        // Ignore obvious headers
+        const lower = line.toLowerCase();
 
-    const ignored =
-        [
-            "opening balance",
-            "closing balance",
-            "available balance",
-            "statement period",
-            "account number",
-            "account name",
-            "total credits",
-            "total debits",
-            "transaction history",
-            "transaction date",
-            "description",
-            "debit",
-            "credit",
-            "balance"
-        ];
+        if (
+            lower.includes("transaction date") ||
+            lower.includes("money in") ||
+            lower.includes("money out") ||
+            lower === "date description" ||
+            lower.includes("opening balance") ||
+            lower.includes("closing balance")
+        ) {
+            continue;
+        }
 
 
-    if (
-        ignored.some(word =>
-            lower.includes(word)
-        )
-    ) {
-        return null;
+        // Kuda transaction dates
+        const dateMatch =
+            line.match(
+                /\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b/
+            );
+
+
+        if (!dateMatch) continue;
+
+
+        const date = dateMatch[0];
+
+
+        // Find currency/amount values
+        const amounts =
+            line.match(
+                /(?:₦|NGN)?\s*-?\d[\d,]*(?:\.\d{2})?/g
+            );
+
+
+        if (!amounts || !amounts.length) continue;
+
+
+        const parsed =
+            amounts
+                .map(parseMoney)
+                .filter(n => n !== 0);
+
+
+        if (!parsed.length) continue;
+
+
+        /*
+         * Kuda rows normally contain the transaction
+         * amount and balance. The final number is usually
+         * the balance, so use the transaction amount rather
+         * than blindly treating every number as money.
+         */
+
+        let amount = 0;
+
+
+        if (parsed.length >= 2) {
+
+            amount =
+                Math.abs(
+                    parsed[parsed.length - 2]
+                );
+
+        } else {
+
+            amount =
+                Math.abs(parsed[0]);
+        }
+
+
+        if (!amount) continue;
+
+
+        let description =
+            line
+                .replace(date, "")
+                .replace(
+                    /(?:₦|NGN)?\s*-?\d[\d,]*(?:\.\d{2})?/g,
+                    ""
+                )
+                .replace(/\s+/g, " ")
+                .trim();
+
+
+        if (!description) {
+            description = "Bank transaction";
+        }
+
+
+        const income =
+            isIncome("", description, parsed[0]);
+
+
+        transactions.push({
+
+            date,
+
+            description:
+                cleanDescription(description),
+
+            amount,
+
+            type:
+                income
+                    ? "income"
+                    : "expense",
+
+            category:
+                categorize(description)
+
+        });
     }
 
 
-    const date = dateMatch[0];
-
-    const afterDate =
-        text
-            .slice(
-                dateMatch.index +
-                date.length
-            )
-            .trim();
-
-
-    /*
-     * Find money values.
-     * We take the final meaningful amount(s)
-     * rather than treating every number as a transaction.
-     */
-
-    const amounts =
-        afterDate.match(
-            /(?:₦|NGN)?\s?-?\d[\d,]*(?:\.\d{2})?/g
-        );
-
-
-    if (!amounts || !amounts.length) {
-        return null;
-    }
-
-
-    const values =
-        amounts
-            .map(parseMoney)
-            .filter(v => Math.abs(v) > 0);
-
-
-    if (!values.length) return null;
-
-
-    /*
-     * Kuda rows commonly contain description,
-     * debit/credit and balance.
-     *
-     * The last number is usually balance,
-     * so use the previous amount when possible.
-     */
-
-    let amount;
-
-    if (values.length >= 2) {
-        amount = Math.abs(values[values.length - 2]);
-    } else {
-        amount = Math.abs(values[0]);
-    }
-
-
-    if (!amount) return null;
-
-
-    let description =
-        afterDate
-            .replace(
-                /(?:₦|NGN)?\s?-?\d[\d,]*(?:\.\d{2})?/g,
-                ""
-            )
-            .replace(/\s+/g, " ")
-            .trim();
-
-
-    if (!description) return null;
-
-
-    const type =
-        detectType(
-            "",
-            description,
-            afterDate
-        );
-
-
-    return {
-
-        date,
-
-        description,
-
-        amount,
-
-        type,
-
-        category:
-            type === "expense"
-                ? categorize(description)
-                : "Income"
-
-    };
+    return calculateFinancials(transactions);
 }
 
 
@@ -568,9 +594,9 @@ function parseKudaRow(row) {
 // TRANSACTION TYPE
 // ========================================
 
-function detectType(type, description, amount) {
+function isIncome(type, description, amount) {
 
-    const value =
+    const text =
         (
             type +
             " " +
@@ -579,108 +605,74 @@ function detectType(type, description, amount) {
 
 
     if (
-        value.includes("credit") ||
-        value.includes("deposit") ||
-        value.includes("salary") ||
-        value.includes("income") ||
-        value.includes("refund") ||
-        value.includes("received") ||
-        value.includes("inflow") ||
-        value.includes("money received") ||
-        value.includes("cashback")
+        text.includes("credit") ||
+        text.includes("deposit") ||
+        text.includes("salary") ||
+        text.includes("income") ||
+        text.includes("received") ||
+        text.includes("refund") ||
+        text.includes("cashback") ||
+        text.includes("money in") ||
+        text.includes("inflow")
     ) {
-        return "income";
+        return true;
     }
 
 
-    if (
-        value.includes("debit") ||
-        value.includes("withdraw") ||
-        value.includes("payment") ||
-        value.includes("purchase") ||
-        value.includes("pos") ||
-        value.includes("transfer to") ||
-        value.includes("sent") ||
-        value.includes("outflow") ||
-        value.includes("airtime") ||
-        value.includes("data")
-    ) {
-        return "expense";
-    }
-
-
-    if (typeof amount === "number" && amount < 0) {
-        return "expense";
-    }
-
-
-    return "expense";
+    return Number(amount) < 0;
 }
 
 
 // ========================================
-// EXPENSE CATEGORIES
+// CATEGORY
 // ========================================
 
 function categorize(description) {
 
     const text =
-        String(description).toLowerCase();
+        String(description)
+            .toLowerCase();
 
 
     if (
-        /food|restaurant|eatery|meal|pizza|chicken|burger|suya|groceries|market|supermarket|kuda food/i
-            .test(text)
+        /food|restaurant|eat|chicken|pizza|grocery|market|supermarket|shoprite|foodco|meal/.test(text)
     ) {
         return "Food";
     }
 
 
     if (
-        /uber|bolt|taxi|transport|bus|fuel|petrol|diesel|parking|ride/i
-            .test(text)
+        /uber|bolt|taxi|transport|fuel|petrol|gas|bus|car|ride/.test(text)
     ) {
         return "Transport";
     }
 
 
     if (
-        /electric|power|phcn|aedc|water|internet|wifi|subscription|netflix|dstv|gotv|bill|utility/i
-            .test(text)
+        /electric|ikeja|aedc|phcn|water|internet|airtel|mtn|glo|9mobile|dstv|gotv|bill/.test(text)
     ) {
         return "Bills";
     }
 
 
     if (
-        /movie|cinema|spotify|music|game|gaming|concert|entertainment|club/i
-            .test(text)
+        /netflix|spotify|showmax|movie|cinema|game|entertainment|club/.test(text)
     ) {
         return "Entertainment";
     }
 
 
     if (
-        /shop|shopping|jumia|amazon|clothing|fashion|store|purchase/i
-            .test(text)
+        /transfer|bank transfer|send money/.test(text)
+    ) {
+        return "Transfers";
+    }
+
+
+    if (
+        /shop|store|amazon|jumia|konga|purchase|pos/.test(text)
     ) {
         return "Shopping";
-    }
-
-
-    if (
-        /airtime|data|mtn|airtel|glo|9mobile/i
-            .test(text)
-    ) {
-        return "Bills";
-    }
-
-
-    if (
-        /transfer|bank|fee|charge|commission|stamp duty/i
-            .test(text)
-    ) {
-        return "Other";
     }
 
 
@@ -689,7 +681,24 @@ function categorize(description) {
 
 
 // ========================================
-// FINANCIAL CALCULATIONS
+// CLEAN DESCRIPTION
+// ========================================
+
+function cleanDescription(value) {
+
+    return String(value || "")
+        .replace(/\s+/g, " ")
+        .replace(
+            /\b[A-Z0-9]{8,}\b/g,
+            ""
+        )
+        .trim()
+        .slice(0, 70) || "Bank transaction";
+}
+
+
+// ========================================
+// CALCULATE FINANCIALS
 // ========================================
 
 function calculateFinancials(transactions) {
@@ -703,6 +712,7 @@ function calculateFinancials(transactions) {
         Bills: 0,
         Entertainment: 0,
         Shopping: 0,
+        Transfers: 0,
         Other: 0
     };
 
@@ -717,13 +727,16 @@ function calculateFinancials(transactions) {
 
             expenses += transaction.amount;
 
-            if (categories[transaction.category] !== undefined) {
-                categories[transaction.category] +=
-                    transaction.amount;
+            if (
+                categories[
+                    transaction.category
+                ] !== undefined
+            ) {
+                categories[
+                    transaction.category
+                ] += transaction.amount;
             }
-
         }
-
     });
 
 
@@ -752,13 +765,9 @@ function emptyData() {
     return {
 
         transactions: [],
-
         income: 0,
-
         expenses: 0,
-
         savings: 0,
-
         balance: 0,
 
         categories: {
@@ -767,6 +776,7 @@ function emptyData() {
             Bills: 0,
             Entertainment: 0,
             Shopping: 0,
+            Transfers: 0,
             Other: 0
         }
 
@@ -788,7 +798,12 @@ function parseMoney(value) {
     }
 
 
-    const raw = String(value).trim();
+    const raw =
+        String(value).trim();
+
+
+    if (!raw) return 0;
+
 
     const negative =
         raw.includes("-") ||
@@ -822,21 +837,21 @@ function parseMoney(value) {
 
 function updateDashboard(data) {
 
-    // Balance
     const balance =
         document.querySelector(".balance h2");
 
-    if (balance) {
-        balance.textContent =
-            formatNaira(data.balance);
-    }
-
-
-    // Summary
     const cards =
         document.querySelectorAll(
             ".summary .card h3"
         );
+
+
+    if (balance) {
+
+        balance.textContent =
+            formatNaira(data.balance);
+
+    }
 
 
     if (cards.length >= 3) {
@@ -853,13 +868,9 @@ function updateDashboard(data) {
     }
 
 
-    updateTransactions(data.transactions);
-
+    updateTransactions(data);
     updateSpending(data);
-
     updateBudget(data);
-
-    updateInsights(data);
 }
 
 
@@ -867,7 +878,7 @@ function updateDashboard(data) {
 // RECENT TRANSACTIONS
 // ========================================
 
-function updateTransactions(transactions) {
+function updateTransactions(data) {
 
     const list =
         document.querySelector(
@@ -878,7 +889,7 @@ function updateTransactions(transactions) {
     if (!list) return;
 
 
-    if (!transactions.length) {
+    if (!data.transactions.length) {
 
         list.innerHTML = `
             <div class="transaction empty-transaction">
@@ -891,7 +902,7 @@ function updateTransactions(transactions) {
 
 
     list.innerHTML =
-        transactions
+        data.transactions
             .slice(-8)
             .reverse()
             .map(transaction => `
@@ -902,23 +913,29 @@ function updateTransactions(transactions) {
 
                         <strong>
                             ${escapeHTML(
-                                cleanDescription(
-                                    transaction.description
-                                )
+                                transaction.description
                             )}
                         </strong>
 
                         <small>
                             ${escapeHTML(
-                                transaction.date || ""
+                                transaction.category
                             )}
                         </small>
 
                     </div>
 
-                    <strong class="${transaction.type}">
+                    <strong class="${
+                        transaction.type === "income"
+                            ? "income"
+                            : "expense"
+                    }">
 
-                        ${transaction.type === "income" ? "+" : "-"}
+                        ${
+                            transaction.type === "income"
+                                ? "+"
+                                : "-"
+                        }
 
                         ${formatNaira(
                             transaction.amount
@@ -933,31 +950,19 @@ function updateTransactions(transactions) {
 }
 
 
-function cleanDescription(description) {
-
-    return String(description)
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 90);
-}
-
-
 // ========================================
 // SPENDING OVERVIEW
 // ========================================
 
 function updateSpending(data) {
 
-    const spending =
-        document.querySelector(".spending");
-
-    if (!spending) return;
-
-
     const items =
-        spending.querySelectorAll(
+        document.querySelectorAll(
             ".spending-item"
         );
+
+
+    if (!items.length) return;
 
 
     const categories = [
@@ -968,14 +973,15 @@ function updateSpending(data) {
     ];
 
 
-    const max =
-        Math.max(
-            ...categories.map(
-                category =>
-                    data.categories[category] || 0
-            ),
-            1
+    const values =
+        categories.map(
+            category =>
+                data.categories[category] || 0
         );
+
+
+    const max =
+        Math.max(...values, 1);
 
 
     items.forEach((item, index) => {
@@ -986,36 +992,34 @@ function updateSpending(data) {
         if (!category) return;
 
 
-        const amount =
+        const value =
             data.categories[category] || 0;
 
 
-        const value =
-            item.querySelector(
-                "div:first-child span"
-            );
+        const amount =
+            item.querySelector("span");
 
         const bar =
-            item.querySelector(
-                ".progress-bar"
-            );
+            item.querySelector(".progress-bar");
 
 
-        if (value) {
-            value.textContent =
-                formatNaira(amount);
+        if (amount) {
+
+            amount.textContent =
+                formatNaira(value);
+
         }
 
 
         if (bar) {
 
             bar.style.width =
-                (
-                    amount / max * 100
+                Math.min(
+                    (value / max) * 100,
+                    100
                 ) + "%";
 
         }
-
     });
 }
 
@@ -1026,124 +1030,94 @@ function updateSpending(data) {
 
 function updateBudget(data) {
 
-    const budget =
-        document.querySelector(".budget");
-
-    if (!budget) return;
-
-
     const amount =
-        budget.querySelector(
+        document.querySelector(
             ".budget-amount h3"
         );
 
-    const subtitle =
-        budget.querySelector(
+    const description =
+        document.querySelector(
             ".budget-amount p"
         );
 
-    const message =
-        budget.querySelector(
-            ".budget-message"
-        );
-
-    const progress =
-        budget.querySelector(
+    const bar =
+        document.querySelector(
             ".budget-progress-bar"
         );
 
+    const message =
+        document.querySelector(
+            ".budget-message"
+        );
+
+
+    /*
+     * Until the user creates a specific budget,
+     * income is used as the available monthly amount.
+     */
+
+    const budget =
+        data.income;
+
+
+    const spent =
+        data.expenses;
+
+
+    const percentage =
+        budget > 0
+            ? Math.min(
+                (spent / budget) * 100,
+                100
+            )
+            : 0;
+
 
     if (amount) {
+
         amount.textContent =
-            formatNaira(data.expenses);
+            formatNaira(spent);
+
     }
 
 
-    if (subtitle) {
-        subtitle.textContent =
-            `of ${formatNaira(data.expenses)} spent`;
+    if (description) {
+
+        description.textContent =
+            "of " +
+            formatNaira(budget) +
+            " available";
+
     }
 
 
-    if (progress) {
-        progress.style.width =
-            data.expenses > 0
-                ? "100%"
-                : "0%";
+    if (bar) {
+
+        bar.style.width =
+            percentage + "%";
+
     }
 
 
     if (message) {
 
-        if (data.expenses > 0) {
+        if (!budget) {
 
             message.textContent =
-                `${data.transactions.length} transactions analyzed.`;
+                "No income was detected in this statement.";
+
+        } else if (spent > budget) {
+
+            message.textContent =
+                "Your spending is higher than your recorded income.";
 
         } else {
 
             message.textContent =
-                "No expenses found in this statement.";
+                Math.round(percentage) +
+                "% of your available income has been spent.";
 
         }
-
-    }
-}
-
-
-// ========================================
-// FINANCIAL INSIGHTS
-// ========================================
-
-function updateInsights(data) {
-
-    const card =
-        document.querySelector(".insight-card");
-
-    if (!card) return;
-
-
-    const title =
-        card.querySelector("h3");
-
-    const text =
-        card.querySelector("p");
-
-
-    if (!title || !text) return;
-
-
-    const biggest =
-        Object.entries(data.categories)
-            .sort((a, b) => b[1] - a[1])[0];
-
-
-    if (!data.transactions.length) {
-
-        title.textContent =
-            "No transactions found";
-
-        text.textContent =
-            "Try another statement or check that the statement contains transaction records.";
-
-        return;
-    }
-
-
-    title.textContent =
-        "Your finances have been analyzed";
-
-
-    if (biggest && biggest[1] > 0) {
-
-        text.textContent =
-            `${biggest[0]} is currently your largest spending category at ${formatNaira(biggest[1])}. You have ${formatNaira(data.savings)} left after recorded income and expenses.`;
-
-    } else {
-
-        text.textContent =
-            `Fin-dash analyzed ${data.transactions.length} transactions with ${formatNaira(data.income)} in income and ${formatNaira(data.expenses)} in expenses.`;
-
     }
 }
 
@@ -1156,7 +1130,6 @@ function showComplete(data, fileName) {
 
     analyzingState.style.display = "none";
     completeState.style.display = "flex";
-
 
     const name =
         document.getElementById(
@@ -1208,7 +1181,6 @@ function showUploadError() {
     completeState.style.display = "none";
     uploadState.style.display = "block";
 
-
     const title =
         uploadState.querySelector("h2");
 
@@ -1221,10 +1193,9 @@ function showUploadError() {
             "Couldn't analyze statement";
     }
 
-
     if (message) {
         message.textContent =
-            "Make sure your statement is a supported CSV, XLSX, XLS, or PDF file.";
+            "Make sure you're using a valid Kuda CSV, XLSX, XLS, or PDF statement.";
     }
 
 
@@ -1245,7 +1216,7 @@ function showUploadError() {
 
 
 // ========================================
-// FORMAT
+// FORMAT NAIRA
 // ========================================
 
 function formatNaira(value) {
@@ -1277,7 +1248,7 @@ function escapeHTML(value) {
 
 
 // ========================================
-// XLSX
+// LOAD XLSX
 // ========================================
 
 function loadXLSX() {
@@ -1306,7 +1277,7 @@ function loadXLSX() {
 
 
 // ========================================
-// PDF.JS
+// LOAD PDF.JS
 // ========================================
 
 function loadPDFJS() {
@@ -1327,19 +1298,20 @@ function loadPDFJS() {
 
         script.onload = () => {
 
-            if (!window.pdfjsLib) {
+            if (window.pdfjsLib) {
+
+                pdfjsLib.GlobalWorkerOptions.workerSrc =
+                    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+                resolve();
+
+            } else {
+
                 reject(
-                    new Error("PDF.js failed to load")
+                    new Error("PDF.js failed")
                 );
-                return;
+
             }
-
-
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-                "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-            resolve();
-
         };
 
         script.onerror = reject;
@@ -1411,17 +1383,10 @@ if (marketToggle) {
             marketData.style.display = "none";
 
             stopMarket();
-
         }
-
     });
-
 }
 
-
-// ========================================
-// MARKET CHART
-// ========================================
 
 let marketPoints = [
     48,46,47,44,45,42,43,40,42,39,
@@ -1458,11 +1423,11 @@ function drawFinancialChart() {
 
 
     ctx.setTransform(
-        dpr,0,0,dpr,0,0
+        dpr, 0, 0, dpr, 0, 0
     );
 
     ctx.clearRect(
-        0,0,width,height
+        0, 0, width, height
     );
 
 
@@ -1479,11 +1444,10 @@ function drawFinancialChart() {
 
         ctx.beginPath();
 
-        ctx.moveTo(0,y);
-        ctx.lineTo(width,y);
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
 
         ctx.stroke();
-
     }
 
 
@@ -1498,7 +1462,7 @@ function drawFinancialChart() {
 
 
     const points =
-        marketPoints.map((value,index) => ({
+        marketPoints.map((value, index) => ({
 
             x:
                 (index /
@@ -1548,24 +1512,21 @@ function drawFinancialChart() {
                 next.x,
                 next.y
             );
-
         }
-
     }
 
 
     spline();
 
-    ctx.lineTo(width,height);
-    ctx.lineTo(0,height);
+    ctx.lineTo(width, height);
+    ctx.lineTo(0, height);
     ctx.closePath();
 
 
     const gradient =
         ctx.createLinearGradient(
-            0,0,0,height
+            0, 0, 0, height
         );
-
 
     gradient.addColorStop(
         0,
@@ -1576,7 +1537,6 @@ function drawFinancialChart() {
         1,
         "rgba(108,60,255,0)"
     );
-
 
     ctx.fillStyle = gradient;
     ctx.fill();
@@ -1614,7 +1574,6 @@ function drawFinancialChart() {
     const last =
         points[points.length - 1];
 
-
     ctx.beginPath();
 
     ctx.arc(
@@ -1631,18 +1590,12 @@ function drawFinancialChart() {
     ctx.shadowColor = "#bda8ff";
 
     ctx.fill();
-
 }
 
-
-// ========================================
-// MARKET NUMBERS
-// ========================================
 
 function startMarketNumbers() {
 
     clearInterval(priceTimer);
-
 
     const price =
         document.getElementById("usdPrice");
@@ -1650,60 +1603,57 @@ function startMarketNumbers() {
     const change =
         document.getElementById("usdChange");
 
-
     if (!price || !change) return;
 
 
     let currentPrice = 1530;
 
 
-    priceTimer =
-        setInterval(() => {
+    priceTimer = setInterval(() => {
 
-            currentPrice +=
-                (Math.random() - .46) * 2;
-
-
-            price.textContent =
-                "₦" +
-                currentPrice.toLocaleString(
-                    "en-NG",
-                    {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    }
-                );
+        currentPrice +=
+            (Math.random() - .46) * 2;
 
 
-            change.textContent =
-                "+" +
-                (
-                    Math.random() * .7 + .1
-                ).toFixed(2) +
-                "%";
-
-
-            const last =
-                marketPoints[
-                    marketPoints.length - 1
-                ];
-
-
-            marketPoints.push(
-                last +
-                (Math.random() - .47) * 5
+        price.textContent =
+            "₦" +
+            currentPrice.toLocaleString(
+                "en-NG",
+                {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
             );
 
 
-            if (marketPoints.length > 42) {
-                marketPoints.shift();
-            }
+        change.textContent =
+            "+" +
+            (
+                Math.random() * .7 + .1
+            ).toFixed(2) +
+            "%";
 
 
-            drawFinancialChart();
+        const last =
+            marketPoints[
+                marketPoints.length - 1
+            ];
 
-        },3000);
 
+        marketPoints.push(
+            last +
+            (Math.random() - .47) * 5
+        );
+
+
+        if (marketPoints.length > 42) {
+            marketPoints.shift();
+        }
+
+
+        drawFinancialChart();
+
+    }, 3000);
 }
 
 
@@ -1714,10 +1664,6 @@ function stopMarket() {
     priceTimer = null;
 }
 
-
-// ========================================
-// RESIZE
-// ========================================
 
 window.addEventListener("resize", () => {
 
@@ -1730,6 +1676,6 @@ window.addEventListener("resize", () => {
                 drawFinancialChart();
             }
 
-        },150);
+        }, 150);
 
 });
