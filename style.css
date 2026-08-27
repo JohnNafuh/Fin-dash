@@ -1,3 +1,11 @@
+@font-face {
+    font-family: "Gendy";
+    src: url("Gendy.otf") format("opentype");
+}
+
+header h1 {
+    font-family: "Gendy", sans-serif;
+}
 * {
     margin: 0;
     padding: 0;
