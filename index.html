@@ -20,53 +20,248 @@
 
     <main>
 
-        <!-- BALANCE -->
+        <!-- =================================
+             STATEMENT ANALYZER
+        ================================== -->
 
-        <section class="balance">
-            <p>Total Balance</p>
-            <h2>₦0.00</h2>
+        <section class="statement-analyzer" id="statementAnalyzer">
+
+            <!-- UPLOAD STATE -->
+
+            <div class="statement-upload" id="statementUpload">
+
+                <div class="upload-icon">
+                    ↑
+                </div>
+
+                <h2>Upload Bank Statement</h2>
+
+                <p>
+                    Turn your transactions into a clear
+                    picture of your finances.
+                </p>
+
+                <span class="file-types">
+                    CSV • XLSX • PDF
+                </span>
+
+                <input
+                    type="file"
+                    id="statementFile"
+                    accept=".csv,.xlsx,.xls,.pdf"
+                    hidden
+                >
+
+                <button
+                    class="upload-button"
+                    id="chooseStatement"
+                    type="button"
+                >
+                    Choose Statement
+                </button>
+
+                <small>
+                    Your statement is processed securely.
+                </small>
+
+            </div>
+
+
+            <!-- ANALYZING STATE -->
+
+            <div
+                class="statement-analyzing"
+                id="statementAnalyzing"
+                style="display: none;"
+            >
+
+                <div class="statement-rings">
+
+                    <span></span>
+                    <span></span>
+                    <span></span>
+
+                </div>
+
+                <h2>
+                    Analyzing your finances
+                </h2>
+
+                <p id="analyzingFileName">
+                    Reading your statement...
+                </p>
+
+                <div class="analysis-progress">
+
+                    <div
+                        class="analysis-progress-bar"
+                        id="analysisProgressBar"
+                    ></div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ANALYZED STATE -->
+
+            <div
+                class="statement-complete"
+                id="statementComplete"
+                style="display: none;"
+            >
+
+                <div class="complete-icon">
+                    ✓
+                </div>
+
+                <h2>
+                    Statement analyzed
+                </h2>
+
+                <p id="statementFileName">
+                    Statement ready
+                </p>
+
+                <div class="statement-stats">
+
+                    <div>
+                        <strong id="transactionCount">
+                            0
+                        </strong>
+
+                        <span>
+                            Transactions
+                        </span>
+                    </div>
+
+                    <div>
+                        <strong id="statementIncome">
+                            ₦0.00
+                        </strong>
+
+                        <span>
+                            Income
+                        </span>
+                    </div>
+
+                    <div>
+                        <strong id="statementExpenses">
+                            ₦0.00
+                        </strong>
+
+                        <span>
+                            Expenses
+                        </span>
+                    </div>
+
+                </div>
+
+                <button
+                    class="analyze-another"
+                    id="analyzeAnother"
+                    type="button"
+                >
+                    Analyze Another Statement
+                </button>
+
+            </div>
+
         </section>
 
 
-        <!-- SUMMARY -->
+        <!-- =================================
+             BALANCE
+        ================================== -->
+
+        <section class="balance">
+
+            <p>Total Balance</p>
+
+            <h2>
+                ₦0.00
+            </h2>
+
+        </section>
+
+
+        <!-- =================================
+             SUMMARY
+        ================================== -->
 
         <section class="summary">
 
             <div class="card">
-                <p>Income</p>
-                <h3>₦0.00</h3>
+
+                <p>
+                    Income
+                </p>
+
+                <h3>
+                    ₦0.00
+                </h3>
+
             </div>
 
-            <div class="card">
-                <p>Expenses</p>
-                <h3>₦0.00</h3>
-            </div>
 
             <div class="card">
-                <p>Savings</p>
-                <h3>₦0.00</h3>
+
+                <p>
+                    Expenses
+                </p>
+
+                <h3>
+                    ₦0.00
+                </h3>
+
+            </div>
+
+
+            <div class="card">
+
+                <p>
+                    Savings
+                </p>
+
+                <h3>
+                    ₦0.00
+                </h3>
+
             </div>
 
         </section>
 
 
-        <!-- QUICK ACTIONS -->
+        <!-- =================================
+             QUICK ACTIONS
+        ================================== -->
 
         <section class="quick-actions">
 
-            <h2>Quick Actions</h2>
+            <h2>
+                Quick Actions
+            </h2>
 
             <div class="action-buttons">
 
-                <button class="action income">
+                <button
+                    class="action income"
+                    type="button"
+                >
                     + Income
                 </button>
 
-                <button class="action expense">
+                <button
+                    class="action expense"
+                    type="button"
+                >
                     − Expense
                 </button>
 
-                <button class="action transfer">
+                <button
+                    class="action transfer"
+                    type="button"
+                >
                     ⇄ Transfer
                 </button>
 
@@ -75,24 +270,35 @@
         </section>
 
 
-        <!-- RECENT TRANSACTIONS -->
+        <!-- =================================
+             RECENT TRANSACTIONS
+        ================================== -->
 
         <section class="transactions">
 
             <div class="section-title">
 
-                <h2>Recent Transactions</h2>
+                <h2>
+                    Recent Transactions
+                </h2>
 
-                <button>
+                <button
+                    type="button"
+                >
                     View All
                 </button>
 
             </div>
 
+
             <div class="transaction-list">
 
                 <div class="transaction empty-transaction">
-                    <p>No transactions yet.</p>
+
+                    <p>
+                        No transactions yet.
+                    </p>
+
                 </div>
 
             </div>
@@ -100,15 +306,21 @@
         </section>
 
 
-        <!-- SPENDING OVERVIEW -->
+        <!-- =================================
+             SPENDING OVERVIEW
+        ================================== -->
 
         <section class="spending">
 
             <div class="section-title">
 
-                <h2>Spending Overview</h2>
+                <h2>
+                    Spending Overview
+                </h2>
 
-                <span>This Month</span>
+                <span>
+                    This Month
+                </span>
 
             </div>
 
@@ -121,7 +333,11 @@
                 </div>
 
                 <div class="progress">
-                    <div class="progress-bar food"></div>
+
+                    <div
+                        class="progress-bar food"
+                    ></div>
+
                 </div>
 
             </div>
@@ -135,7 +351,11 @@
                 </div>
 
                 <div class="progress">
-                    <div class="progress-bar transport"></div>
+
+                    <div
+                        class="progress-bar transport"
+                    ></div>
+
                 </div>
 
             </div>
@@ -149,7 +369,11 @@
                 </div>
 
                 <div class="progress">
-                    <div class="progress-bar bills"></div>
+
+                    <div
+                        class="progress-bar bills"
+                    ></div>
+
                 </div>
 
             </div>
@@ -163,7 +387,11 @@
                 </div>
 
                 <div class="progress">
-                    <div class="progress-bar entertainment"></div>
+
+                    <div
+                        class="progress-bar entertainment"
+                    ></div>
+
                 </div>
 
             </div>
@@ -171,22 +399,30 @@
         </section>
 
 
-        <!-- MONTHLY BUDGET -->
+        <!-- =================================
+             MONTHLY BUDGET
+        ================================== -->
 
         <section class="budget">
 
             <div class="section-title">
 
-                <h2>Monthly Budget</h2>
+                <h2>
+                    Monthly Budget
+                </h2>
 
-                <span>August</span>
+                <span>
+                    August
+                </span>
 
             </div>
 
 
             <div class="budget-amount">
 
-                <h3>₦0.00</h3>
+                <h3>
+                    ₦0.00
+                </h3>
 
                 <p>
                     of ₦0.00 spent
@@ -203,21 +439,28 @@
 
 
             <p class="budget-message">
-                Add transactions to start tracking your budget.
+                Upload a bank statement to start
+                tracking your budget.
             </p>
 
         </section>
 
 
-        <!-- SAVINGS GOAL -->
+        <!-- =================================
+             SAVINGS GOAL
+        ================================== -->
 
         <section class="goal">
 
             <div class="section-title">
 
-                <h2>Savings Goal</h2>
+                <h2>
+                    Savings Goal
+                </h2>
 
-                <button>
+                <button
+                    type="button"
+                >
                     + New Goal
                 </button>
 
@@ -228,9 +471,13 @@
 
                 <div>
 
-                    <p>New Goal</p>
+                    <p>
+                        New Goal
+                    </p>
 
-                    <h3>₦0.00</h3>
+                    <h3>
+                        ₦0.00
+                    </h3>
 
                     <span>
                         of ₦500,000
@@ -252,12 +499,18 @@
         </section>
 
 
-        <!-- FINANCIAL INSIGHTS -->
+        <!-- =================================
+             FINANCIAL INSIGHTS
+        ================================== -->
 
         <section class="insights">
 
             <div class="section-title">
-                <h2>Financial Insights</h2>
+
+                <h2>
+                    Financial Insights
+                </h2>
+
             </div>
 
 
@@ -275,9 +528,10 @@
                     </h3>
 
                     <p>
-                        Add your first transaction and
-                        Fin-dash will start analyzing
-                        your spending habits.
+                        Upload your bank statement
+                        and Fin-dash will analyze
+                        your transactions and
+                        spending habits.
                     </p>
 
                 </div>
@@ -289,7 +543,9 @@
     </main>
 
 
-    <!-- LIVE MARKET BAR -->
+    <!-- =================================
+         LIVE MARKET BAR
+    ================================== -->
 
     <div class="market-wrapper">
 
@@ -306,7 +562,10 @@
             </div>
 
 
-            <button id="marketToggle">
+            <button
+                id="marketToggle"
+                type="button"
+            >
                 ⌃
             </button>
 
@@ -327,7 +586,6 @@
                 <span></span>
 
             </div>
-
 
             <p>
                 Loading market data...
@@ -368,16 +626,14 @@
             </div>
 
 
-            <!-- CHART -->
-
             <div class="chart-container">
 
-                <canvas id="marketChart"></canvas>
+                <canvas
+                    id="marketChart"
+                ></canvas>
 
             </div>
 
-
-            <!-- OTHER ASSETS -->
 
             <div class="market-assets">
 
@@ -426,7 +682,9 @@
     </div>
 
 
-    <!-- FOOTER -->
+    <!-- =================================
+         FOOTER
+    ================================== -->
 
     <footer>
 
