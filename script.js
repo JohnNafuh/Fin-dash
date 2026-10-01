@@ -883,6 +883,7 @@ function detectBank(text) {
 const STORE_KEY = "findash:statements:v2";
 const BUDGET_KEY = "findash:budget";
 const GOAL_KEY = "findash:goal";
+const TX_PREVIEW = 5;
 
 const CATEGORY_COLORS = {
     Transfers: "var(--c-transfers)",
@@ -902,7 +903,7 @@ const state = {
     statements: [],
     filter: "all",
     search: "",
-    shown: 40,
+    shown: TX_PREVIEW,
     summary: null
 };
 
@@ -1619,20 +1620,27 @@ document.querySelectorAll(".segmented button").forEach(button => {
         document.querySelectorAll(".segmented button").forEach(b => b.classList.remove("is-active"));
         button.classList.add("is-active");
         state.filter = button.dataset.filter;
-        state.shown = 40;
+        state.shown = TX_PREVIEW;
         renderTransactions();
     });
 });
 
 $("txSearch").addEventListener("input", event => {
     state.search = event.target.value.trim().toLowerCase();
-    state.shown = 40;
+    state.shown = TX_PREVIEW;
     renderTransactions();
 });
 
 $("txMore").addEventListener("click", () => {
-    state.shown += 60;
+    const expanded = state.shown > TX_PREVIEW;
+
+    state.shown = expanded ? TX_PREVIEW : Infinity;
     renderTransactions();
+
+    // Collapsing: jump back to the top of the panel
+    if (expanded) {
+        document.querySelector(".area-tx").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 });
 
 function renderTransactions() {
@@ -1656,7 +1664,7 @@ function renderTransactions() {
         );
     }
 
-    $("txMeta").textContent = `${list.length} shown`;
+    $("txMeta").textContent = `${list.length} transaction${list.length === 1 ? "" : "s"}`;
 
     if (!list.length) {
         $("txList").innerHTML = `<p class="tx-empty">No transactions match. Try another search or filter.</p>`;
@@ -1704,8 +1712,11 @@ function renderTransactions() {
     });
 
     $("txList").innerHTML = html;
-    $("txMore").hidden = list.length <= state.shown;
-    $("txMore").textContent = `Show more (${list.length - state.shown} left)`;
+    $("txMore").hidden = list.length <= TX_PREVIEW;
+    $("txMore").textContent = state.shown > TX_PREVIEW
+        ? "Show less"
+        : `Show all ${list.length} transactions`;
+    $("txMore").setAttribute("aria-expanded", String(state.shown > TX_PREVIEW));
 }
 
 // ---------- Goal ----------
