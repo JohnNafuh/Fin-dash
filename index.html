@@ -3,697 +3,234 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#E8EDE9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0D1A19" media="(prefers-color-scheme: dark)">
+    <meta name="description" content="Upload your bank statements and see where your money goes. Everything is processed in your browser.">
 
     <title>Fin-dash</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <header>
-        <h1>Fin-dash</h1>
-        <p>Your personal finance dashboard</p>
+    <header class="topbar">
+        <a class="wordmark" href="./">Fin-dash</a>
+
+        <div class="topbar-actions" id="topbarActions" hidden>
+            <button class="btn btn-quiet" id="exportBtn" type="button">Export CSV</button>
+            <button class="btn btn-quiet" id="clearBtn" type="button">Clear data</button>
+            <button class="btn btn-solid" id="addBtn" type="button">Add statement</button>
+        </div>
     </header>
 
+    <input type="file" id="fileInput" accept=".pdf,.csv,.xlsx,.xls" multiple hidden>
 
-    <main>
+    <!-- EMPTY STATE -->
+    <main class="empty" id="emptyView">
 
-        <!-- =================================
-             STATEMENT ANALYZER
-        ================================== -->
+        <section class="drop" id="dropZone" tabindex="0" role="button" aria-label="Choose bank statements to upload">
 
-        <section class="statement-analyzer" id="statementAnalyzer">
-
-            <!-- UPLOAD STATE -->
-
-            <div class="statement-upload" id="statementUpload">
-
-                <div class="upload-icon">
-                    ↑
-                </div>
-
-                <h2>Upload Bank Statement</h2>
-
-                <p>
-                    Turn your transactions into a clear
-                    picture of your finances.
-                </p>
-
-                <span class="file-types">
-                    CSV • XLSX • PDF
-                </span>
-
-                <input
-                    type="file"
-                    id="statementFile"
-                    accept=".csv,.xlsx,.xls,.pdf"
-                    hidden
-                >
-
-                <button
-                    class="upload-button"
-                    id="chooseStatement"
-                    type="button"
-                >
-                    Choose Statement
-                </button>
-
-                <small>
-                    Your statement is processed securely.
-                </small>
-
+            <div class="drop-art" aria-hidden="true">
+                <svg viewBox="0 0 120 80" class="drop-note">
+                    <rect x="2" y="2" width="116" height="76" rx="10" />
+                    <circle cx="92" cy="40" r="20" />
+                    <path d="M18 26h44M18 38h32M18 50h40" />
+                </svg>
             </div>
 
-
-            <!-- ANALYZING STATE -->
-
-            <div
-                class="statement-analyzing"
-                id="statementAnalyzing"
-                style="display: none;"
-            >
-
-                <div class="statement-rings">
-
-                    <span></span>
-                    <span></span>
-                    <span></span>
-
-                </div>
-
-                <h2>
-                    Analyzing your finances
-                </h2>
-
-                <p id="analyzingFileName">
-                    Reading your statement...
-                </p>
-
-                <div class="analysis-progress">
-
-                    <div
-                        class="analysis-progress-bar"
-                        id="analysisProgressBar"
-                    ></div>
-
-                </div>
-
-            </div>
-
-
-            <!-- ANALYZED STATE -->
-
-            <div
-                class="statement-complete"
-                id="statementComplete"
-                style="display: none;"
-            >
-
-                <div class="complete-icon">
-                    ✓
-                </div>
-
-                <h2>
-                    Statement analyzed
-                </h2>
-
-                <p id="statementFileName">
-                    Statement ready
-                </p>
-
-                <div class="statement-stats">
-
-                    <div>
-                        <strong id="transactionCount">
-                            0
-                        </strong>
-
-                        <span>
-                            Transactions
-                        </span>
-                    </div>
-
-                    <div>
-                        <strong id="statementIncome">
-                            ₦0.00
-                        </strong>
-
-                        <span>
-                            Income
-                        </span>
-                    </div>
-
-                    <div>
-                        <strong id="statementExpenses">
-                            ₦0.00
-                        </strong>
-
-                        <span>
-                            Expenses
-                        </span>
-                    </div>
-
-                </div>
-
-                <button
-                    class="analyze-another"
-                    id="analyzeAnother"
-                    type="button"
-                >
-                    Analyze Another Statement
-                </button>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================
-             BALANCE
-        ================================== -->
-
-        <section class="balance">
-
-            <p>Total Balance</p>
-
-            <h2>
-                ₦0.00
-            </h2>
-
-        </section>
-
-
-        <!-- =================================
-             SUMMARY
-        ================================== -->
-
-        <section class="summary">
-
-            <div class="card">
-
-                <p>
-                    Income
-                </p>
-
-                <h3>
-                    ₦0.00
-                </h3>
-
-            </div>
-
-
-            <div class="card">
-
-                <p>
-                    Expenses
-                </p>
-
-                <h3>
-                    ₦0.00
-                </h3>
-
-            </div>
-
-
-            <div class="card">
-
-                <p>
-                    Savings
-                </p>
-
-                <h3>
-                    ₦0.00
-                </h3>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================
-             QUICK ACTIONS
-        ================================== -->
-
-        <section class="quick-actions">
-
-            <h2>
-                Quick Actions
-            </h2>
-
-            <div class="action-buttons">
-
-                <button
-                    class="action income"
-                    type="button"
-                >
-                    + Income
-                </button>
-
-                <button
-                    class="action expense"
-                    type="button"
-                >
-                    − Expense
-                </button>
-
-                <button
-                    class="action transfer"
-                    type="button"
-                >
-                    ⇄ Transfer
-                </button>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================
-             RECENT TRANSACTIONS
-        ================================== -->
-
-        <section class="transactions">
-
-            <div class="section-title">
-
-                <h2>
-                    Recent Transactions
-                </h2>
-
-                <button
-                    type="button"
-                >
-                    View All
-                </button>
-
-            </div>
-
-
-            <div class="transaction-list">
-
-                <div class="transaction empty-transaction">
-
-                    <p>
-                        No transactions yet.
-                    </p>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================
-             SPENDING OVERVIEW
-        ================================== -->
-
-        <section class="spending">
-
-            <div class="section-title">
-
-                <h2>
-                    Spending Overview
-                </h2>
-
-                <span>
-                    This Month
-                </span>
-
-            </div>
-
-
-            <div class="spending-item">
-
-                <div>
-                    <p>Food</p>
-                    <span>₦0.00</span>
-                </div>
-
-                <div class="progress">
-
-                    <div
-                        class="progress-bar food"
-                    ></div>
-
-                </div>
-
-            </div>
-
-
-            <div class="spending-item">
-
-                <div>
-                    <p>Transport</p>
-                    <span>₦0.00</span>
-                </div>
-
-                <div class="progress">
-
-                    <div
-                        class="progress-bar transport"
-                    ></div>
-
-                </div>
-
-            </div>
-
-
-            <div class="spending-item">
-
-                <div>
-                    <p>Bills</p>
-                    <span>₦0.00</span>
-                </div>
-
-                <div class="progress">
-
-                    <div
-                        class="progress-bar bills"
-                    ></div>
-
-                </div>
-
-            </div>
-
-
-            <div class="spending-item">
-
-                <div>
-                    <p>Entertainment</p>
-                    <span>₦0.00</span>
-                </div>
-
-                <div class="progress">
-
-                    <div
-                        class="progress-bar entertainment"
-                    ></div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================
-             MONTHLY BUDGET
-        ================================== -->
-
-        <section class="budget">
-
-            <div class="section-title">
-
-                <h2>
-                    Monthly Budget
-                </h2>
-
-                <span>
-                    August
-                </span>
-
-            </div>
-
-
-            <div class="budget-amount">
-
-                <h3>
-                    ₦0.00
-                </h3>
-
-                <p>
-                    of ₦0.00 spent
-                </p>
-
-            </div>
-
-
-            <div class="budget-progress">
-
-                <div class="budget-progress-bar"></div>
-
-            </div>
-
-
-            <p class="budget-message">
-                Upload a bank statement to start
-                tracking your budget.
+            <h1>See where your money actually goes</h1>
+
+            <p>
+                Drop in your bank statements and Fin-dash sorts every transaction
+                into income, spending and categories.
             </p>
 
-        </section>
+            <button class="btn btn-solid btn-big" id="chooseBtn" type="button">Choose statements</button>
 
+            <p class="drop-hint">
+                Or drag files here. PDF, CSV or Excel from Kuda, OPay, GTBank,
+                Moniepoint, PalmPay, Access and most Nigerian banks.
+            </p>
 
-        <!-- =================================
-             SAVINGS GOAL
-        ================================== -->
-
-        <section class="goal">
-
-            <div class="section-title">
-
-                <h2>
-                    Savings Goal
-                </h2>
-
-                <button
-                    type="button"
-                >
-                    + New Goal
-                </button>
-
-            </div>
-
-
-            <div class="goal-content">
-
-                <div>
-
-                    <p>
-                        New Goal
-                    </p>
-
-                    <h3>
-                        ₦0.00
-                    </h3>
-
-                    <span>
-                        of ₦500,000
-                    </span>
-
-                </div>
-
-
-                <div class="goal-circle">
-
-                    <span>
-                        0%
-                    </span>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================
-             FINANCIAL INSIGHTS
-        ================================== -->
-
-        <section class="insights">
-
-            <div class="section-title">
-
-                <h2>
-                    Financial Insights
-                </h2>
-
-            </div>
-
-
-            <div class="insight-card">
-
-                <div class="insight-icon">
-                    ✦
-                </div>
-
-
-                <div>
-
-                    <h3>
-                        Let's get started
-                    </h3>
-
-                    <p>
-                        Upload your bank statement
-                        and Fin-dash will analyze
-                        your transactions and
-                        spending habits.
-                    </p>
-
-                </div>
-
-            </div>
+            <p class="drop-privacy">
+                Your statements never leave this device. Nothing is uploaded to a server.
+            </p>
 
         </section>
 
     </main>
 
-
-    <!-- =================================
-         LIVE MARKET BAR
-    ================================== -->
-
-    <div class="market-wrapper">
-
-        <div class="market-header">
-
-            <div class="market-title">
-
-                <span class="live-dot"></span>
-
-                <span>
-                    LIVE MARKET
-                </span>
-
-            </div>
-
-
-            <button
-                id="marketToggle"
-                type="button"
-            >
-                ⌃
-            </button>
-
+    <!-- LOADING -->
+    <div class="loading" id="loadingView" hidden>
+        <div class="loading-card" role="status" aria-live="polite">
+            <div class="loading-bar"><span id="loadingBar"></span></div>
+            <p id="loadingText">Reading statement…</p>
         </div>
-
-
-        <!-- LOADING STATE -->
-
-        <div
-            class="market-loading"
-            id="marketLoading"
-        >
-
-            <div class="rings">
-
-                <span></span>
-                <span></span>
-                <span></span>
-
-            </div>
-
-            <p>
-                Loading market data...
-            </p>
-
-        </div>
-
-
-        <!-- MARKET DATA -->
-
-        <div
-            class="market-data"
-            id="marketData"
-        >
-
-            <div class="market-info">
-
-                <div>
-
-                    <span>
-                        USD / NGN
-                    </span>
-
-                    <strong id="usdPrice">
-                        ₦1,530.00
-                    </strong>
-
-                </div>
-
-
-                <div
-                    class="market-change positive"
-                    id="usdChange"
-                >
-                    +0.42%
-                </div>
-
-            </div>
-
-
-            <div class="chart-container">
-
-                <canvas
-                    id="marketChart"
-                ></canvas>
-
-            </div>
-
-
-            <div class="market-assets">
-
-                <div>
-
-                    <span>
-                        BTC
-                    </span>
-
-                    <strong>
-                        $113,420
-                    </strong>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        GOLD
-                    </span>
-
-                    <strong>
-                        $3,420
-                    </strong>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        S&amp;P 500
-                    </span>
-
-                    <strong>
-                        6,420
-                    </strong>
-
-                </div>
-
-            </div>
-
-        </div>
-
     </div>
 
+    <!-- DASHBOARD -->
+    <main class="dash" id="dashView" hidden>
 
-    <!-- =================================
-         FOOTER
-    ================================== -->
+        <!-- BALANCE NOTE -->
+        <section class="note" aria-label="Balance">
+            <svg class="guilloche" id="guilloche" aria-hidden="true"></svg>
 
-    <footer>
+            <div class="note-body">
+                <p class="note-label">Balance across your accounts</p>
+                <p class="note-figure" id="balanceFigure">₦0.00</p>
+                <p class="note-period" id="periodText"></p>
 
-        <p>
-            Fin-dash
-        </p>
+                <dl class="note-stats">
+                    <div>
+                        <dt>Money in</dt>
+                        <dd class="is-in" id="inFigure">₦0</dd>
+                    </div>
+                    <div>
+                        <dt>Money out</dt>
+                        <dd class="is-out" id="outFigure">₦0</dd>
+                    </div>
+                    <div>
+                        <dt>You kept</dt>
+                        <dd id="netFigure">₦0</dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
 
+        <div class="col col-main">
+
+        <!-- WHERE IT WENT -->
+        <section class="panel area-flow">
+            <div class="panel-head">
+                <h2>Where it went</h2>
+                <span class="panel-meta" id="flowMeta"></span>
+            </div>
+
+            <div class="flow-strip" id="flowStrip" role="img" aria-label="Spending by category"></div>
+
+            <ul class="flow-legend" id="flowLegend"></ul>
+        </section>
+
+        <!-- CASH FLOW -->
+        <section class="panel area-chart">
+            <div class="panel-head">
+                <h2>Day by day</h2>
+                <div class="chart-key">
+                    <span class="key key-in">In</span>
+                    <span class="key key-out">Out</span>
+                </div>
+            </div>
+
+            <div class="chart" id="chart"></div>
+            <p class="chart-tip" id="chartTip">Tap a day to see its totals.</p>
+        </section>
+
+        <!-- TRANSACTIONS -->
+        <section class="panel area-tx">
+            <div class="panel-head">
+                <h2>Transactions</h2>
+                <span class="panel-meta" id="txMeta"></span>
+            </div>
+
+            <div class="tx-tools">
+                <input type="search" id="txSearch" placeholder="Search names, banks, notes" aria-label="Search transactions">
+
+                <div class="segmented" role="tablist" aria-label="Filter transactions">
+                    <button type="button" class="is-active" data-filter="all">All</button>
+                    <button type="button" data-filter="income">In</button>
+                    <button type="button" data-filter="expense">Out</button>
+                    <button type="button" data-filter="internal">Savings moves</button>
+                </div>
+            </div>
+
+            <div class="tx-list" id="txList"></div>
+
+            <button class="btn btn-quiet btn-wide" id="txMore" type="button" hidden>Show more</button>
+        </section>
+
+        </div>
+
+        <div class="col col-side">
+
+        <!-- BUDGET -->
+        <section class="panel area-budget">
+            <div class="panel-head">
+                <h2>Monthly budget</h2>
+                <button class="link" id="budgetEdit" type="button">Set budget</button>
+            </div>
+
+            <div id="budgetBody"></div>
+
+            <form class="inline-form" id="budgetForm" hidden>
+                <label for="budgetInput">Monthly spending limit (₦)</label>
+                <div class="inline-row">
+                    <input id="budgetInput" type="number" inputmode="decimal" min="0" step="any" placeholder="150000" required>
+                    <button class="btn btn-solid" type="submit">Save budget</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- INSIGHTS -->
+        <section class="panel area-insights">
+            <div class="panel-head">
+                <h2>Worth knowing</h2>
+            </div>
+            <ul class="insights" id="insights"></ul>
+        </section>
+
+        <!-- TOP PAYEES -->
+        <section class="panel area-people">
+            <div class="panel-head">
+                <h2>Who you paid most</h2>
+            </div>
+            <ol class="people" id="people"></ol>
+        </section>
+
+
+        <!-- GOAL -->
+        <section class="panel area-goal">
+            <div class="panel-head">
+                <h2>Savings goal</h2>
+                <button class="link" id="goalEdit" type="button">Set goal</button>
+            </div>
+
+            <div id="goalBody"></div>
+
+            <form class="inline-form" id="goalForm" hidden>
+                <label for="goalName">What are you saving for?</label>
+                <input id="goalName" type="text" maxlength="40" placeholder="New laptop" required>
+
+                <label for="goalTarget">Target amount (₦)</label>
+                <div class="inline-row">
+                    <input id="goalTarget" type="number" inputmode="decimal" min="1" step="any" placeholder="500000" required>
+                    <button class="btn btn-solid" type="submit">Save goal</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- STATEMENTS -->
+        <section class="panel area-files">
+            <div class="panel-head">
+                <h2>Statements</h2>
+            </div>
+            <ul class="files" id="files"></ul>
+        </section>
+
+        </div>
+
+    </main>
+
+    <div class="toast" id="toast" role="alert" hidden></div>
+
+    <footer class="foot">
+        <p>Fin-dash works with statements from Nigerian banks and fintechs.</p>
     </footer>
-
 
     <script src="script.js"></script>
 
