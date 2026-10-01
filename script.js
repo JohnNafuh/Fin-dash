@@ -1,6 +1,6 @@
 // ========================================
 // FIN-DASH
-// KUDA STATEMENT ANALYZER + LIVE MARKET
+// BANK STATEMENT ANALYZER + LIVE MARKET
 // ========================================
 
 // ========================================
@@ -126,1258 +126,751 @@ function startAnalysis(file) {
 
 async function analyzeStatement(file) {
 
-    const extension =
-        file.name
-            .split(".")
-            .pop()
-            .toLowerCase();
+    const extension = file.name.split(".").pop().toLowerCase();
 
-    // CSV
-    if (extension === "csv") {
-
-        const text = await file.text();
-
-        return parseCSV(text);
-    }
-
-    // XLSX / XLS
-    if (
-        extension === "xlsx" ||
-        extension === "xls"
-    ) {
+    // CSV / XLSX / XLS -> grid of cells (SheetJS handles quoted commas)
+    if (["csv", "xlsx", "xls"].includes(extension)) {
 
         await loadXLSX();
 
-        const buffer =
-            await file.arrayBuffer();
+        const workbook = extension === "csv"
+            ? XLSX.read(await file.text(), { type: "string", raw: true })
+            : XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
 
-        const workbook =
-            XLSX.read(
-                buffer,
-                {
-                    type: "array"
-                }
-            );
+        let rows = [];
 
-        const sheet =
-            workbook.Sheets[
-                workbook.SheetNames[0]
-            ];
-
-        const rows =
-            XLSX.utils.sheet_to_json(
-                sheet,
-                {
-                    header: 1,
-                    defval: ""
-                }
-            );
+        workbook.SheetNames.forEach(name => {
+            rows.push(...XLSX.utils.sheet_to_json(workbook.Sheets[name], {
+                header: 1,
+                defval: "",
+                raw: false
+            }));
+        });
 
         return parseRows(rows);
     }
 
-    // PDF
+    // PDF -> positioned text items per page
     if (extension === "pdf") {
 
         await loadPDFJS();
 
-        const buffer =
-            await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
 
-        const pdf =
-            await pdfjsLib.getDocument({
-                data: buffer
-            }).promise;
+        const pages = [];
 
-        let rows = [];
+        for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
 
-        for (
-            let pageNo = 1;
-            pageNo <= pdf.numPages;
-            pageNo++
-        ) {
+            const page = await pdf.getPage(pageNo);
+            const content = await page.getTextContent();
 
-            const page =
-                await pdf.getPage(pageNo);
-
-            const content =
-                await page.getTextContent();
-
-            const pageRows =
-                groupPDFItems(
-                    content.items
-                );
-
-            rows.push(...pageRows);
+            pages.push({
+                items: content.items
+                    .filter(item => item.str && item.str.trim())
+                    .map(item => ({
+                        str: item.str.trim(),
+                        x: item.transform[4],
+                        y: item.transform[5],
+                        w: item.width
+                    }))
+            });
         }
 
-        return parseKudaPDFRows(rows);
+        const hasText = pages.some(page => page.items.length);
+
+        if (!hasText) {
+            throw new Error("This PDF has no text layer (it may be a scanned image).");
+        }
+
+        return parsePDFStatement(pages);
     }
 
     throw new Error("Unsupported file type");
 }
 
 // ========================================
-// CSV PARSER
+// COLUMN ROLES (works across banks)
+// Kuda, OPay, GTBank, Moniepoint, Access,
+// Zenith, PalmPay, UBA, First Bank, etc.
 // ========================================
 
-function parseCSV(text) {
+const COLUMN_ROLES = [
+    ["date", /^(trans(action)?\.?\s*(date|time)|date\s*\/?\s*time|date|txn\.?\s*date|tran\.?\s*date|posting\s*date|post\s*date|entry\s*date)$/i],
+    ["credit", /^(money\s*in|credits?|deposits?|inflow|lodgements?|cr\.?\s*amount|credit\s*amount)$/i],
+    ["debit", /^(money\s*out|debits?|withdrawals?|outflow|dr\.?\s*amount|debit\s*amount)$/i],
+    ["amount", /^(amount|transaction\s*amount|amt)$/i],
+    ["balance", /^(balance|running\s*balance|bal\.?|balance\s*after|available\s*balance|closing\s*balance)/i],
+    ["desc", /^(description|narration|narrative|remarks?|details|particulars|to\s*\/\s*from|beneficiary|counterparty|transaction\s*details|memo)$/i],
+    ["kind", /^(category|type|transaction\s*type|dr\s*\/\s*cr|cr\s*\/\s*dr)$/i],
+    ["ignore", /^(value\s*date|channel|reference|ref\.?|ref\.?\s*no\.?|transaction\s*reference|session\s*id|originating\s*branch|branch|cheque\s*no\.?|time)$/i]
+];
 
-    const rows =
-        text
-            .split(/\r?\n/)
-            .filter(line => line.trim())
-            .map(line =>
-                line
-                    .split(",")
-                    .map(cell =>
-                        cell
-                            .replace(/^"|"$/g, "")
-                            .trim()
-                    )
-            );
+function columnRole(text) {
 
-    return parseRows(rows);
+    const clean = String(text || "")
+        .replace(/[()₦]/g, " ")
+        .replace(/\(?NGN\)?/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (!clean || clean.length > 40) {
+        return null;
+    }
+
+    for (const [role, pattern] of COLUMN_ROLES) {
+        if (pattern.test(clean)) {
+            return role;
+        }
+    }
+
+    return null;
 }
 
 // ========================================
-// XLSX / CSV ROW PARSER
+// DATES
+// ========================================
+
+const MONTHS = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+};
+
+function parseDate(value) {
+
+    if (value instanceof Date && !isNaN(value)) {
+        return value;
+    }
+
+    const text = String(value || "").trim();
+    let match;
+
+    // 22/08/25, 22-08-2025, 22.08.2025 (day first, Nigerian format)
+    if ((match = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/))) {
+        return buildDate(match[3], Number(match[2]) - 1, match[1], text);
+    }
+
+    // 31 Aug 2026, 30-Sep-2023, 01 September, 2025
+    if ((match = text.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s-]+([A-Za-z]{3})[A-Za-z]*\.?,?[\s-]+(\d{2,4})\b/))) {
+        const month = MONTHS[match[2].toLowerCase()];
+        return month === undefined ? null : buildDate(match[3], month, match[1], text);
+    }
+
+    // Aug 31, 2026
+    if ((match = text.match(/^([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/))) {
+        const month = MONTHS[match[1].toLowerCase()];
+        return month === undefined ? null : buildDate(match[3], month, match[2], text);
+    }
+
+    // 2026-08-31
+    if ((match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})\b/))) {
+        return buildDate(match[1], Number(match[2]) - 1, match[3], text);
+    }
+
+    return null;
+}
+
+function buildDate(year, month, day, fullText) {
+
+    let y = Number(year);
+
+    if (y < 100) {
+        y += 2000;
+    }
+
+    const date = new Date(y, month, Number(day));
+
+    if (isNaN(date) || date.getMonth() !== month) {
+        return null;
+    }
+
+    const time = String(fullText || "").match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+
+    if (time) {
+        date.setHours(Number(time[1]), Number(time[2]), Number(time[3] || 0));
+    }
+
+    return date;
+}
+
+function formatDate(date) {
+
+    if (!(date instanceof Date) || isNaN(date)) {
+        return "";
+    }
+
+    return date.toLocaleDateString("en-NG", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+}
+
+// ========================================
+// MONEY
+// ========================================
+
+// Amounts must have 2 decimals, so account
+// numbers and references are never read as money.
+const AMOUNT_PATTERN =
+    /^[-(]?\s*(?:₦|NGN|N)?\s*-?\s*(?:\d{1,3}(?:,\d{3})+|\d+)?\.\d{2}\s*\)?\s*(?:CR|DR)?$/i;
+
+function isAmount(text) {
+    return AMOUNT_PATTERN.test(String(text || "").trim());
+}
+
+function parseMoney(value) {
+
+    if (value === undefined || value === null) {
+        return 0;
+    }
+
+    if (typeof value === "number") {
+        return value;
+    }
+
+    const raw = String(value).trim();
+
+    if (!raw || /^[-–—]+$/.test(raw)) {
+        return 0;
+    }
+
+    const negative =
+        /^-|^\(|-\s*\d|\bDR$/i.test(raw);
+
+    const number = parseFloat(raw.replace(/[^\d.]/g, ""));
+
+    if (isNaN(number)) {
+        return 0;
+    }
+
+    return negative ? -Math.abs(number) : number;
+}
+
+// ========================================
+// PDF: LINES + HEADER DETECTION
+// ========================================
+
+function groupLines(items, tolerance = 2.5) {
+
+    const lines = [];
+
+    [...items]
+        .sort((a, b) => b.y - a.y)
+        .forEach(item => {
+
+            let line = lines.find(existing => Math.abs(existing.y - item.y) <= tolerance);
+
+            if (!line) {
+                line = { y: item.y, items: [] };
+                lines.push(line);
+            }
+
+            line.items.push(item);
+        });
+
+    lines.forEach(line => line.items.sort((a, b) => a.x - b.x));
+
+    return lines;
+}
+
+function detectHeader(items) {
+
+    // Merge fragments that sit side by side ("Money" + "In", "Debit" + "(₦)")
+    const cells = [];
+
+    [...items]
+        .sort((a, b) => a.x - b.x)
+        .forEach(item => {
+
+            const previous = cells[cells.length - 1];
+
+            if (
+                previous &&
+                item.x - (previous.x + previous.w) < 4 &&
+                Math.abs(item.y - previous.y) < 3
+            ) {
+                previous.str += " " + item.str;
+                previous.w = item.x + item.w - previous.x;
+            } else {
+                cells.push({ ...item });
+            }
+        });
+
+    const columns = [];
+
+    cells.forEach(cell => {
+
+        const role = columnRole(cell.str);
+
+        if (role) {
+            columns.push({
+                role,
+                x: cell.x,
+                w: cell.w,
+                center: cell.x + cell.w / 2
+            });
+        }
+    });
+
+    const has = role => columns.some(column => column.role === role);
+
+    if (has("date") && (has("debit") || has("credit") || has("amount"))) {
+        return columns;
+    }
+
+    return null;
+}
+
+function nearestColumn(item, columns) {
+
+    // Left-aligned tables: item starts exactly under the header
+    const aligned = columns.find(column => Math.abs(column.x - item.x) < 3);
+
+    if (aligned) {
+        return aligned;
+    }
+
+    // Centered / right-aligned tables: closest header center
+    const center = item.x + item.w / 2;
+
+    let best = null;
+    let bestDistance = Infinity;
+
+    columns.forEach(column => {
+
+        const distance = Math.abs(column.center - center);
+
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            best = column;
+        }
+    });
+
+    return best;
+}
+
+// ========================================
+// PDF: STATEMENT PARSER
+// ========================================
+
+function parsePDFStatement(pages) {
+
+    let columns = null;
+    const rows = [];
+
+    pages.forEach((page, pageIndex) => {
+
+        // Ignore long paragraph text (footers, disclaimers)
+        const items = page.items.filter(item => item.w < 300);
+        const lines = groupLines(items);
+
+        const headerYs = [];
+        const anchors = [];
+
+        lines.forEach(line => {
+
+            // Header row (also catches headers that wrap onto 2 lines)
+            if (detectHeader(line.items)) {
+
+                const band = lines
+                    .filter(other => Math.abs(other.y - line.y) <= 8)
+                    .flatMap(other => other.items);
+
+                columns = detectHeader(band) || detectHeader(line.items);
+                headerYs.push(line.y);
+
+                return;
+            }
+
+            if (!columns || headerYs.some(y => Math.abs(line.y - y) <= 8)) {
+                return;
+            }
+
+            // Every date sitting in the date column starts a new transaction
+            const dateColumn = columns.find(column => column.role === "date");
+
+            const dateItem = line.items.find(item =>
+                Math.abs(item.x - dateColumn.x) < 25 &&
+                parseDate(item.str)
+            );
+
+            if (dateItem) {
+                anchors.push({
+                    y: line.y,
+                    page: pageIndex,
+                    columns,
+                    items: []
+                });
+            }
+        });
+
+        if (!anchors.length) {
+            return;
+        }
+
+        // How far text can sit from its row (wrapped descriptions, split dates)
+        const gaps = anchors
+            .slice(1)
+            .map((anchor, index) => anchors[index].y - anchor.y)
+            .filter(gap => gap > 0)
+            .sort((a, b) => a - b);
+
+        const medianGap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 40;
+        const reach = Math.max(12, medianGap * 0.75);
+
+        items.forEach(item => {
+
+            if (headerYs.some(y => Math.abs(item.y - y) <= 8)) {
+                return;
+            }
+
+            let closest = null;
+            let closestDistance = Infinity;
+
+            anchors.forEach(anchor => {
+
+                const distance = Math.abs(anchor.y - item.y);
+
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closest = anchor;
+                }
+            });
+
+            if (closest && closestDistance <= reach) {
+                closest.items.push(item);
+            }
+        });
+
+        rows.push(...anchors);
+    });
+
+    if (!rows.length) {
+        throw new Error("No transaction table found in this PDF.");
+    }
+
+    const transactions = [];
+
+    rows.forEach(row => {
+
+        let debit = 0;
+        let credit = 0;
+        let amount = null;
+        let balance = null;
+
+        const dateParts = [];
+        const descriptionParts = {};
+        const kindParts = [];
+
+        row.items
+            .sort((a, b) => b.y - a.y || a.x - b.x)
+            .forEach(item => {
+
+                const column = nearestColumn(item, row.columns);
+
+                if (!column) {
+                    return;
+                }
+
+                const text = item.str;
+
+                if (column.role === "date") {
+                    dateParts.push(text);
+                    return;
+                }
+
+                if (["debit", "credit", "balance", "amount"].includes(column.role)) {
+
+                    if (!isAmount(text)) {
+                        return;
+                    }
+
+                    const value = parseMoney(text);
+
+                    if (column.role === "debit") debit += Math.abs(value);
+                    if (column.role === "credit") credit += Math.abs(value);
+                    if (column.role === "balance") balance = value;
+                    if (column.role === "amount") amount = (amount || 0) + value;
+
+                    return;
+                }
+
+                if (column.role === "desc") {
+                    (descriptionParts[column.x] = descriptionParts[column.x] || []).push(text);
+                    return;
+                }
+
+                if (column.role === "kind") {
+                    kindParts.push(text);
+                }
+            });
+
+        const kind = kindParts.join(" ");
+
+        // Single "Amount" column: sign or type decides direction
+        if (amount !== null && !debit && !credit) {
+
+            if (amount < 0 || /\b(dr|debit)\b/i.test(kind)) {
+                debit = Math.abs(amount);
+            } else {
+                credit = Math.abs(amount);
+            }
+        }
+
+        if (!debit && !credit) {
+            return;
+        }
+
+        // Keep column order: "To / From" first, then "Description"
+        const description = Object.keys(descriptionParts)
+            .sort((a, b) => a - b)
+            .map(key => descriptionParts[key].join(" "))
+            .join(" · ");
+
+        transactions.push(
+            buildTransaction(
+                parseDate(dateParts.join(" ")),
+                description,
+                credit ? credit : debit,
+                credit ? "income" : "expense",
+                kind,
+                balance
+            )
+        );
+    });
+
+    return calculateFinancials(transactions, findClosingBalances(pages));
+}
+
+// ========================================
+// PDF: PRINTED CLOSING BALANCE(S)
+// ========================================
+
+function findClosingBalances(pages) {
+
+    const balances = [];
+
+    pages.forEach(page => {
+
+        page.items.forEach(label => {
+
+            if (!/^closing\s*balance:?$/i.test(label.str)) {
+                return;
+            }
+
+            // Value printed beside the label...
+            const beside = page.items.find(item =>
+                item !== label &&
+                isAmount(item.str) &&
+                Math.abs(item.y - label.y) < 3 &&
+                item.x > label.x &&
+                item.x - (label.x + label.w) < 150
+            );
+
+            // ...or just below it
+            const below = page.items
+                .filter(item =>
+                    item !== label &&
+                    isAmount(item.str) &&
+                    Math.abs(item.x - label.x) < 20 &&
+                    label.y - item.y > 0 &&
+                    label.y - item.y < 30
+                )
+                .sort((a, b) => b.y - a.y)[0];
+
+            const value = beside || below;
+
+            if (value) {
+                balances.push(parseMoney(value.str));
+            }
+        });
+    });
+
+    return balances;
+}
+
+// ========================================
+// CSV / XLSX ROW PARSER
 // ========================================
 
 function parseRows(rows) {
 
+    rows = rows.filter(row => Array.isArray(row) && row.some(cell => String(cell).trim()));
+
     if (!rows.length) {
-        return emptyData();
+        throw new Error("The file is empty.");
     }
 
     let headerIndex = -1;
+    let roles = [];
 
-    for (
-        let i = 0;
-        i < Math.min(rows.length, 20);
-        i++
-    ) {
+    for (let i = 0; i < Math.min(rows.length, 40); i++) {
 
-        const text =
-            rows[i]
-                .join(" ")
-                .toLowerCase();
+        const candidate = rows[i].map(cell => columnRole(cell));
+        const has = role => candidate.includes(role);
 
-        if (
-            text.includes("date") &&
-            (
-                text.includes("description") ||
-                text.includes("narration") ||
-                text.includes("amount") ||
-                text.includes("money out") ||
-                text.includes("money in")
-            )
-        ) {
-
+        if (has("date") && (has("debit") || has("credit") || has("amount"))) {
             headerIndex = i;
+            roles = candidate;
             break;
         }
     }
 
     if (headerIndex < 0) {
-        headerIndex = 0;
+        throw new Error("Couldn't find the transaction columns.");
     }
 
-    const headers =
-        rows[headerIndex]
-            .map(value =>
-                String(value)
-                    .toLowerCase()
-                    .trim()
-            );
+    // Use the first matching column of each role
+    // (e.g. "Trans. Date" wins over "Value Date")
+    const first = role => roles.indexOf(role);
 
-    const findColumn = (...names) =>
-        headers.findIndex(header =>
-            names.some(name =>
-                header.includes(name)
-            )
-        );
+    const dateIndex = first("date");
+    const debitIndex = first("debit");
+    const creditIndex = first("credit");
+    const amountIndex = first("amount");
+    const balanceIndex = first("balance");
+    const kindIndex = first("kind");
 
-    const dateIndex =
-        findColumn(
-            "date",
-            "transaction date"
-        );
-
-    const descriptionIndex =
-        findColumn(
-            "description",
-            "narration",
-            "details",
-            "merchant",
-            "particular"
-        );
-
-    const moneyInIndex =
-        findColumn(
-            "money in",
-            "credit",
-            "deposit",
-            "inflow"
-        );
-
-    const moneyOutIndex =
-        findColumn(
-            "money out",
-            "debit",
-            "withdrawal",
-            "withdraw",
-            "outflow"
-        );
-
-    const amountIndex =
-        findColumn(
-            "amount",
-            "value"
-        );
-
-    const typeIndex =
-        findColumn(
-            "type",
-            "transaction type"
-        );
+    const descriptionIndexes = roles
+        .map((role, index) => (role === "desc" ? index : -1))
+        .filter(index => index >= 0);
 
     const transactions = [];
 
-    for (
-        let i = headerIndex + 1;
-        i < rows.length;
-        i++
-    ) {
+    for (let i = headerIndex + 1; i < rows.length; i++) {
 
         const row = rows[i];
+        const date = parseDate(row[dateIndex]);
 
-        if (!row || !row.length) {
+        // Repeated headers, totals, blank lines
+        if (!date) {
             continue;
         }
 
-        const description =
-            descriptionIndex >= 0
-                ? String(
-                    row[descriptionIndex] || ""
-                )
-                : "";
-
-        const moneyIn =
-            moneyInIndex >= 0
-                ? parseMoney(
-                    row[moneyInIndex]
-                )
-                : 0;
-
-        const moneyOut =
-            moneyOutIndex >= 0
-                ? parseMoney(
-                    row[moneyOutIndex]
-                )
-                : 0;
-
-        const amount =
-            amountIndex >= 0
-                ? parseMoney(
-                    row[amountIndex]
-                )
-                : 0;
-
-        const type =
-            typeIndex >= 0
-                ? String(
-                    row[typeIndex] || ""
-                )
-                : "";
-
-        if (moneyIn > 0) {
-
-            transactions.push({
-
-                date:
-                    dateIndex >= 0
-                        ? row[dateIndex]
-                        : "",
-
-                description:
-                    cleanDescription(
-                        description
-                    ),
-
-                amount:
-                    moneyIn,
-
-                type:
-                    "income",
-
-                category:
-                    categorize(
-                        description
-                    )
-
-            });
-
-            continue;
-        }
-
-        if (moneyOut > 0) {
-
-            transactions.push({
-
-                date:
-                    dateIndex >= 0
-                        ? row[dateIndex]
-                        : "",
-
-                description:
-                    cleanDescription(
-                        description
-                    ),
-
-                amount:
-                    moneyOut,
-
-                type:
-                    "expense",
-
-                category:
-                    categorize(
-                        description
-                    )
-
-            });
-
-            continue;
-        }
-
-        if (amount !== 0) {
-
-            const income =
-                isIncome(
-                    type,
-                    description,
-                    amount
-                );
-
-            transactions.push({
-
-                date:
-                    dateIndex >= 0
-                        ? row[dateIndex]
-                        : "",
-
-                description:
-                    cleanDescription(
-                        description
-                    ),
-
-                amount:
-                    Math.abs(amount),
-
-                type:
-                    income
-                        ? "income"
-                        : "expense",
-
-                category:
-                    categorize(
-                        description
-                    )
-
-            });
-
-        }
-
-    }
-
-    return calculateFinancials(
-        transactions
-    );
-}
-
-// ========================================
-// PDF ITEM GROUPING
-// ========================================
-
-function groupPDFItems(items) {
-
-    const rows = [];
-
-    const tolerance = 4;
-
-    items.forEach(item => {
-
-        const text =
-            String(
-                item.str || ""
-            ).trim();
-
-        if (!text) {
-            return;
-        }
-
-        const x =
-            item.transform[4];
-
-        const y =
-            item.transform[5];
-
-        let row =
-            rows.find(existing =>
-                Math.abs(
-                    existing.y - y
-                ) <= tolerance
-            );
-
-        if (!row) {
-
-            row = {
-                y,
-                items: []
-            };
-
-            rows.push(row);
-        }
-
-        row.items.push({
-            x,
-            text
-        });
-
-    });
-
-    return rows
-        .sort(
-            (a, b) =>
-                b.y - a.y
-        );
-}
-
-// ========================================
-// KUDA PDF PARSER
-// ========================================
-
-function parseKudaPDFRows(rows) {
-
-    const transactions = [];
-
-    let columnPositions = null;
-
-    // ------------------------------------
-    // FIND KUDA COLUMN HEADERS
-    // ------------------------------------
-
-    for (const row of rows) {
-
-        const sortedItems =
-            [...row.items].sort(
-                (a, b) => a.x - b.x
-            );
-
-        const fullText =
-            sortedItems
-                .map(item => item.text)
-                .join(" ")
-                .toLowerCase()
-                .replace(/\s+/g, " ")
-                .trim();
-
-        if (
-            fullText.includes("money in") &&
-            fullText.includes("money out")
-        ) {
-
-            columnPositions =
-                detectKudaColumns(
-                    row
-                );
-
-            break;
-        }
-    }
-
-    // ------------------------------------
-    // READ EACH PDF ROW
-    // ------------------------------------
-
-    for (const row of rows) {
-
-        const sortedItems =
-            [...row.items].sort(
-                (a, b) => a.x - b.x
-            );
-
-        const line =
-            sortedItems
-                .map(item => item.text)
-                .join(" ")
-                .replace(/\s+/g, " ")
-                .trim();
-
-        if (!line) {
-            continue;
-        }
-
-        const lower =
-            line.toLowerCase();
-
-        // Ignore headers / account information
-        if (
-            lower.includes("transaction date") ||
-            lower.includes("money in") ||
-            lower.includes("money out") ||
-            lower.includes("opening balance") ||
-            lower.includes("closing balance") ||
-            lower.includes("account number") ||
-            lower.includes("statement period") ||
-            lower.includes("account name") ||
-            lower === "date description"
-        ) {
-
-            continue;
-        }
-
-        // --------------------------------
-        // FIND DATE
-        // --------------------------------
-
-        const dateMatch =
-            line.match(
-                /\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b/
-            );
-
-        if (!dateMatch) {
-            continue;
-        }
-
-        const date =
-            dateMatch[0];
-
-        // --------------------------------
-        // FIND AMOUNTS WITH POSITIONS
-        // --------------------------------
-
-        const amountItems =
-            extractAmountItems(
-                sortedItems
-            );
-
-        if (!amountItems.length) {
-            continue;
-        }
-
-        let incomeAmount = 0;
-        let expenseAmount = 0;
-
-        // --------------------------------
-        // POSITION-BASED KUDA PARSING
-        // --------------------------------
-
-        if (columnPositions) {
-
-            const incomeCandidates = [];
-            const expenseCandidates = [];
-
-            amountItems.forEach(item => {
-
-                const closest =
-                    getKudaAmountColumn(
-                        item.x,
-                        columnPositions
-                    );
-
-                if (
-                    closest === "moneyIn"
-                ) {
-
-                    incomeCandidates.push(
-                        item.value
-                    );
-
-                }
-
-                if (
-                    closest === "moneyOut"
-                ) {
-
-                    expenseCandidates.push(
-                        item.value
-                    );
-
-                }
-
-            });
-
-            if (
-                incomeCandidates.length
-            ) {
-
-                incomeAmount =
-                    Math.max(
-                        ...incomeCandidates
-                    );
-
+        const debit = debitIndex >= 0 ? Math.abs(parseMoney(row[debitIndex])) : 0;
+        const credit = creditIndex >= 0 ? Math.abs(parseMoney(row[creditIndex])) : 0;
+        const kind = kindIndex >= 0 ? String(row[kindIndex] || "") : "";
+
+        let type = null;
+        let value = 0;
+
+        if (credit > 0) {
+            type = "income";
+            value = credit;
+        } else if (debit > 0) {
+            type = "expense";
+            value = debit;
+        } else if (amountIndex >= 0) {
+
+            const amount = parseMoney(row[amountIndex]);
+
+            if (amount !== 0) {
+                // Negative or marked DR/Debit = money out
+                const isDebit = amount < 0 || /\b(dr|debit|withdrawal)\b/i.test(kind);
+                type = isDebit ? "expense" : "income";
+                value = Math.abs(amount);
             }
-
-            if (
-                expenseCandidates.length
-            ) {
-
-                expenseAmount =
-                    Math.max(
-                        ...expenseCandidates
-                    );
-
-            }
-
         }
 
-        // --------------------------------
-        // FALLBACK PARSING
-        // --------------------------------
-
-        if (
-            incomeAmount === 0 &&
-            expenseAmount === 0
-        ) {
-
-            const parsed =
-                amountItems
-                    .map(item =>
-                        item.value
-                    )
-                    .filter(
-                        value =>
-                            value !== 0
-                    );
-
-            if (!parsed.length) {
-                continue;
-            }
-
-            /*
-             * Kuda statements normally contain:
-             *
-             * Transaction amount
-             * Balance
-             *
-             * Therefore use the transaction
-             * amount immediately before balance.
-             */
-
-            if (parsed.length >= 2) {
-
-                const transactionAmount =
-                    Math.abs(
-                        parsed[
-                            parsed.length - 2
-                        ]
-                    );
-
-                if (
-                    transactionAmount > 0
-                ) {
-
-                    if (
-                        looksLikeIncome(
-                            line
-                        )
-                    ) {
-
-                        incomeAmount =
-                            transactionAmount;
-
-                    } else {
-
-                        expenseAmount =
-                            transactionAmount;
-
-                    }
-
-                }
-
-            } else {
-
-                const transactionAmount =
-                    Math.abs(
-                        parsed[0]
-                    );
-
-                if (
-                    looksLikeIncome(
-                        line
-                    )
-                ) {
-
-                    incomeAmount =
-                        transactionAmount;
-
-                } else {
-
-                    expenseAmount =
-                        transactionAmount;
-
-                }
-
-            }
-
-        }
-
-        // --------------------------------
-        // SKIP NON-TRANSACTION ROWS
-        // --------------------------------
-
-        if (
-            incomeAmount === 0 &&
-            expenseAmount === 0
-        ) {
-
+        if (!type) {
             continue;
         }
 
-        // --------------------------------
-        // CLEAN DESCRIPTION
-        // --------------------------------
+        const description = descriptionIndexes
+            .map(index => String(row[index] || "").trim())
+            .filter(Boolean)
+            .join(" · ");
 
-        let description =
-            extractKudaDescription(
-                sortedItems,
-                date
-            );
-
-        description =
-            cleanDescription(
-                description
-            );
-
-        if (!description) {
-            description =
-                "Bank transaction";
-        }
-
-        // --------------------------------
-        // ADD TRANSACTION
-        // --------------------------------
-
-        if (incomeAmount > 0) {
-
-            transactions.push({
-
+        transactions.push(
+            buildTransaction(
                 date,
-
                 description,
-
-                amount:
-                    incomeAmount,
-
-                type:
-                    "income",
-
-                category:
-                    categorize(
-                        description
-                    )
-
-            });
-
-        } else if (
-            expenseAmount > 0
-        ) {
-
-            transactions.push({
-
-                date,
-
-                description,
-
-                amount:
-                    expenseAmount,
-
-                type:
-                    "expense",
-
-                category:
-                    categorize(
-                        description
-                    )
-
-            });
-
-        }
-
-    }
-
-    return calculateFinancials(
-        transactions
-    );
-}
-
-// ========================================
-// DETECT KUDA COLUMNS
-// ========================================
-
-function detectKudaColumns(row) {
-
-    const items =
-        [...row.items].sort(
-            (a, b) => a.x - b.x
+                value,
+                type,
+                kind,
+                balanceIndex >= 0 ? parseMoney(row[balanceIndex]) : null
+            )
         );
-
-    const columns = {};
-
-    items.forEach(item => {
-
-        const text =
-            String(item.text || "")
-                .toLowerCase()
-                .trim();
-
-        if (
-            text === "balance" ||
-            text.includes("balance")
-        ) {
-
-            columns.balance =
-                item.x;
-
-        }
-
-        if (
-            text === "description" ||
-            text.includes("description")
-        ) {
-
-            columns.description =
-                item.x;
-
-        }
-
-        if (
-            text === "date" ||
-            text.includes("transaction date")
-        ) {
-
-            columns.date =
-                item.x;
-
-        }
-
-        if (
-            text === "money in"
-        ) {
-
-            columns.moneyIn =
-                item.x;
-
-        }
-
-        if (
-            text === "money out"
-        ) {
-
-            columns.moneyOut =
-                item.x;
-
-        }
-
-    });
-
-    // Handle PDF text where "Money" and "In"
-    // or "Money" and "Out" are separate items.
-
-    for (
-        let i = 0;
-        i < items.length - 1;
-        i++
-    ) {
-
-        const first =
-            String(
-                items[i].text || ""
-            )
-                .toLowerCase()
-                .trim();
-
-        const second =
-            String(
-                items[i + 1].text || ""
-            )
-                .toLowerCase()
-                .trim();
-
-        if (
-            first === "money" &&
-            second === "in"
-        ) {
-
-            columns.moneyIn =
-                (
-                    items[i].x +
-                    items[i + 1].x
-                ) / 2;
-
-        }
-
-        if (
-            first === "money" &&
-            second === "out"
-        ) {
-
-            columns.moneyOut =
-                (
-                    items[i].x +
-                    items[i + 1].x
-                ) / 2;
-
-        }
-
     }
 
-    return (
-        columns.moneyIn !== undefined ||
-        columns.moneyOut !== undefined
-    )
-        ? columns
-        : null;
+    return calculateFinancials(transactions, []);
 }
 
 // ========================================
-// GET KUDA AMOUNT COLUMN
+// TRANSACTION BUILDER
 // ========================================
 
-function getKudaAmountColumn(
-    x,
-    columns
-) {
+function buildTransaction(date, rawDescription, amount, type, kind, balance) {
 
-    const candidates = [];
+    const description = cleanDescription(rawDescription);
+    const internal = isInternalMove(rawDescription + " " + kind);
 
-    if (
-        columns.moneyIn !== undefined
-    ) {
-
-        candidates.push({
-
-            name:
-                "moneyIn",
-
-            distance:
-                Math.abs(
-                    x - columns.moneyIn
-                )
-
-        });
-
-    }
-
-    if (
-        columns.moneyOut !== undefined
-    ) {
-
-        candidates.push({
-
-            name:
-                "moneyOut",
-
-            distance:
-                Math.abs(
-                    x - columns.moneyOut
-                )
-
-        });
-
-    }
-
-    if (!candidates.length) {
-        return null;
-    }
-
-    candidates.sort(
-        (a, b) =>
-            a.distance - b.distance
-    );
-
-    return candidates[0].name;
+    return {
+        date,
+        dateLabel: formatDate(date),
+        description,
+        amount: Math.abs(amount),
+        type,
+        balance,
+        internal,
+        category: internal
+            ? "Savings moves"
+            : categorize(rawDescription + " " + kind, type)
+    };
 }
 
 // ========================================
-// GET CLOSEST KUDA COLUMN
+// INTERNAL MOVES
+// Money moving between your own pockets
+// (OPay OWealth, Kuda Spend+Save, PalmPay
+// CashBox, Piggyvest, etc.) is not real
+// income or spending.
 // ========================================
 
-function getClosestKudaColumn(
-    x,
-    columns
-) {
-
-    return getKudaAmountColumn(
-        x,
-        columns
-    );
-}
-
-// ========================================
-// EXTRACT AMOUNTS FROM PDF ITEMS
-// ========================================
-
-function extractAmountItems(items) {
-
-    const results = [];
-
-    items.forEach(item => {
-
-        const text =
-            String(
-                item.text || ""
-            )
-                .trim();
-
-        if (!text) {
-            return;
-        }
-
-        const looksFinancial =
-            /^(?:₦|NGN|\$|£)?\s*-?\s*\d[\d,]*(?:\.\d{1,2})?$/.test(
-                text
-            );
-
-        if (!looksFinancial) {
-            return;
-        }
-
-        const value =
-            parseMoney(text);
-
-        if (
-            Number.isFinite(value) &&
-            value !== 0
-        ) {
-
-            results.push({
-
-                x:
-                    item.x,
-
-                text,
-
-                value:
-                    Math.abs(value)
-
-            });
-
-        }
-
-    });
-
-    return results;
-}
-
-// ========================================
-// EXTRACT KUDA DESCRIPTION
-// ========================================
-
-function extractKudaDescription(
-    items,
-    date
-) {
-
-    const descriptionParts = [];
-
-    items.forEach(item => {
-
-        const text =
-            String(
-                item.text || ""
-            ).trim();
-
-        if (!text) {
-            return;
-        }
-
-        // Remove date
-        if (
-            text === date ||
-            text.includes(date)
-        ) {
-
-            const remaining =
-                text
-                    .replace(
-                        date,
-                        ""
-                    )
-                    .trim();
-
-            if (
-                remaining
-            ) {
-
-                descriptionParts.push(
-                    remaining
-                );
-
-            }
-
-            return;
-        }
-
-        // Ignore amounts
-        if (
-            /^(?:₦|NGN|\$|£)?\s*-?\s*\d[\d,]*(?:\.\d{1,2})?$/.test(
-                text
-            )
-        ) {
-
-            return;
-        }
-
-        // Ignore obvious headers
-        const lower =
-            text.toLowerCase();
-
-        if (
-            lower === "date" ||
-            lower === "description" ||
-            lower === "money in" ||
-            lower === "money out" ||
-            lower === "balance" ||
-            lower === "money"
-        ) {
-
-            return;
-        }
-
-        descriptionParts.push(
-            text
-        );
-
-    });
-
-    return descriptionParts
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-// ========================================
-// INCOME DETECTION
-// ========================================
-
-function isIncome(
-    type,
-    description,
-    amount
-) {
-
-    const text =
-        (
-            type +
-            " " +
-            description
-        )
-            .toLowerCase();
-
-    if (
-        text.includes("credit") ||
-        text.includes("deposit") ||
-        text.includes("salary") ||
-        text.includes("income") ||
-        text.includes("received") ||
-        text.includes("refund") ||
-        text.includes("cashback") ||
-        text.includes("money in") ||
-        text.includes("inflow")
-    ) {
-
-        return true;
-    }
-
-    return Number(amount) < 0;
-}
-
-// ========================================
-// KUDA INCOME HEURISTIC
-// ========================================
-
-function looksLikeIncome(line) {
-
-    const text =
-        line.toLowerCase();
-
-    return (
-        /credit|deposit|salary|received|refund|cashback|money in|inflow|incoming|funded/.test(
-            text
-        )
-    );
+function isInternalMove(text) {
+    return /owealth\s*withdrawal|auto-?save|spend\s*\+?\s*save|save\s*\+?\s*spend|cashbox|to\s+savings|from\s+savings|savings\s+(top\s*up|withdrawal)|pocket\s+transfer|fixed\s+(deposit|savings)\s+(funding|liquidation)|target\s+savings/i.test(String(text || ""));
 }
 
 // ========================================
 // CATEGORY
 // ========================================
 
-function categorize(description) {
+function categorize(text, type) {
 
-    const text =
-        String(description || "")
-            .toLowerCase();
+    const value = String(text || "").toLowerCase();
 
-    // FOOD
-    if (
-        /food|restaurant|eat|chicken|pizza|grocery|market|supermarket|shoprite|foodco|meal|kitchen|cafe|bakery|mcdonald|domino|kfc/.test(
-            text
-        )
-    ) {
-
-        return "Food";
+    if (type === "income") {
+        if (/interest|capitali[sz]ed/.test(value)) return "Interest";
+        if (/reversal|refund|cashback/.test(value)) return "Refunds";
+        if (/salary|payroll|wages/.test(value)) return "Salary";
+        return "Transfers";
     }
 
-    // TRANSPORT
-    if (
-        /uber|bolt|taxi|transport|fuel|petrol|gas|bus|car|ride|indrive|shell|total|mobil/.test(
-            text
-        )
-    ) {
-
-        return "Transport";
-    }
-
-    // BILLS
-    if (
-        /electric|ikeja|aedc|phcn|water|internet|airtel|mtn|glo|9mobile|dstv|gotv|bill|utility|data|recharge|subscription/.test(
-            text
-        )
-    ) {
-
+    if (/stamp\s*duty|vat|withholding|sms\s*(alert|charge)|maintenance\s*fee|commission|charge|levy|\bfee\b/.test(value)) {
         return "Bills";
     }
 
-    // ENTERTAINMENT
-    if (
-        /netflix|spotify|showmax|movie|cinema|game|entertainment|club|concert|music|apple music/.test(
-            text
-        )
-    ) {
+    if (/airtime|mobile\s*data|data\s*(plan|bundle|purchase)|\d+(\.\d+)?\s*gb\b|electric|aedc|ikedc|ekedc|phcn|prepaid|water|internet|spectranet|dstv|gotv|startimes|\bbills?\b|utility|recharge|subscription|mtn|airtel|\bglo\b|9mobile/.test(value)) {
+        return "Bills";
+    }
 
+    if (/netflix|spotify|showmax|apple\.com|youtube\s*premium|movie|cinema|filmhouse|game|betting|bet9ja|sportybet|club|concert|lounge/.test(value)) {
         return "Entertainment";
     }
 
-    // SHOPPING
-    if (
-        /shop|store|amazon|jumia|konga|purchase|pos|mall|fashion|clothing|ikeja city mall/.test(
-            text
-        )
-    ) {
+    if (/food|restaurant|eatery|chicken\s*republic|pizza|grocer|supermarket|shoprite|\bspar\b|foodco|meal|kitchen|cafe|bakery|kfc|domino|chowdeck|glovo|suya/.test(value)) {
+        return "Food";
+    }
 
+    if (/uber|bolt|taxi|indrive|transport|fuel|petrol|filling\s*station|\bnnpc\b|\bmrs\b|ardova|bus\s*(fare|ticket)|parking|toll/.test(value)) {
+        return "Transport";
+    }
+
+    if (/jumia|konga|amazon|aliexpress|temu|mall|fashion|clothing|store|stores|\bshop\b|purchase|paystack|flutterwave|korapay|checkout/.test(value)) {
         return "Shopping";
     }
 
-    // TRANSFERS
-    if (
-        /transfer|bank transfer|send money|sent to|trf|tfr|beneficiary/.test(
-            text
-        )
-    ) {
-
+    if (/transfer|trf|tfr|sent\s+to|beneficiary|pos\b|nip/.test(value)) {
         return "Transfers";
     }
 
@@ -1390,83 +883,38 @@ function categorize(description) {
 
 function cleanDescription(value) {
 
-    let text =
-        String(value || "")
-            .replace(/\s+/g, " ")
-            .trim();
+    let text = String(value || "");
 
-    // Remove dates
-    text =
-        text.replace(
-            /\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b/g,
-            ""
-        );
-
-    // Remove common Kuda reference labels
-    text =
-        text.replace(
-            /\b(reference|session|transaction id|payment reference|ref|transaction reference)\s*[:#-]?\s*/gi,
-            ""
-        );
-
-    // Remove UUID-like references
-    text =
-        text.replace(
-            /\b[0-9a-f]{8}-[0-9a-f-]{20,}\b/gi,
-            ""
-        );
-
-    // Remove long transaction/reference numbers
-    text =
-        text.replace(
-            /\b\d{10,}\b/g,
-            ""
-        );
-
-    // Remove long alphanumeric IDs
-    text =
-        text.replace(
-            /\b[A-Z0-9]{14,}\b/g,
-            ""
-        );
-
-    // Remove currency values
-    text =
-        text.replace(
-            /(?:₦|NGN)\s*[\d,]+(?:\.\d{1,2})?/gi,
-            ""
-        );
-
-    // Remove repeated separators
-    text =
-        text.replace(
-            /[|•]+/g,
-            " "
-        );
-
-    // Remove excess punctuation
-    text =
-        text.replace(
-            /\s*[-–—]\s*$/g,
-            ""
-        );
-
-    text =
-        text
-            .replace(/\s+/g, " ")
-            .trim();
+    text = text
+        // Kuda "Name/0123456789/Bank" -> "Name · Bank"
+        .replace(/\/\s*\d{6,}\s*\//g, " · ")
+        // Masked account numbers 901****233
+        .replace(/\b\d{2,4}\*{2,}\d{2,4}\b/g, "")
+        // Reference junk (AT139_TRF|..., APITRANSFER-...)
+        .replace(/\b[A-Z0-9]+_TRF\|[^\s]*/gi, "")
+        .replace(/APITRANSFER-[^\s|]*/gi, "")
+        // UUIDs, long numbers, long IDs
+        .replace(/\b[0-9a-f]{8}-[0-9a-f-]{8,}\b/gi, "")
+        .replace(/\b\d{9,}\b/g, "")
+        .replace(/\b[A-Z0-9]{16,}\b/g, "")
+        // Dates and amounts that slipped in
+        .replace(/\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/g, "")
+        .replace(/(?:₦|NGN)\s*[\d,]+(?:\.\d{1,2})?/gi, "")
+        // Kuda's generic "kuda" description cell
+        .replace(/·\s*kuda\s*$/i, "")
+        // Separators
+        .replace(/\s*\|\s*(\|\s*)*/g, " · ")
+        .replace(/(\s*·\s*)+/g, " · ")
+        .replace(/^\s*·\s*|\s*·\s*$/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
     if (!text) {
         return "Bank transaction";
     }
 
-    // Keep dashboard cards clean
     if (text.length > 55) {
-
-        text =
-            text.slice(0, 55).trim() +
-            "…";
-
+        text = text.slice(0, 55).trim() + "…";
     }
 
     return text;
@@ -1476,176 +924,91 @@ function cleanDescription(value) {
 // CALCULATE FINANCIALS
 // ========================================
 
-function calculateFinancials(
-    transactions
-) {
+function emptyCategories() {
+    return {
+        Food: 0,
+        Transport: 0,
+        Bills: 0,
+        Entertainment: 0,
+        Shopping: 0,
+        Transfers: 0,
+        Other: 0
+    };
+}
+
+function calculateFinancials(transactions, closingBalances) {
+
+    // Oldest -> newest (statements aren't always in order)
+    transactions.sort((a, b) => (a.date || 0) - (b.date || 0));
 
     let income = 0;
     let expenses = 0;
+    let internalVolume = 0;
 
-    const categories = {
+    const categories = emptyCategories();
 
-        Food: 0,
+    transactions.forEach(transaction => {
 
-        Transport: 0,
-
-        Bills: 0,
-
-        Entertainment: 0,
-
-        Shopping: 0,
-
-        Transfers: 0,
-
-        Other: 0
-
-    };
-
-    transactions.forEach(
-        transaction => {
-
-            const amount =
-                Math.abs(
-                    Number(
-                        transaction.amount
-                    ) || 0
-                );
-
-            if (
-                transaction.type === "income"
-            ) {
-
-                income +=
-                    amount;
-
-            } else {
-
-                expenses +=
-                    amount;
-
-                if (
-                    categories[
-                        transaction.category
-                    ] !== undefined
-                ) {
-
-                    categories[
-                        transaction.category
-                    ] +=
-                        amount;
-
-                }
-
-            }
-
+        if (transaction.internal) {
+            internalVolume += transaction.amount;
+            return;
         }
-    );
+
+        if (transaction.type === "income") {
+            income += transaction.amount;
+            return;
+        }
+
+        expenses += transaction.amount;
+
+        if (categories[transaction.category] !== undefined) {
+            categories[transaction.category] += transaction.amount;
+        } else {
+            categories.Other += transaction.amount;
+        }
+    });
+
+    // Balance: printed closing balance(s) first, then last balance column value
+    let balance = null;
+
+    if (closingBalances && closingBalances.length) {
+        balance = closingBalances.reduce((sum, value) => sum + value, 0);
+    } else {
+        const withBalance = transactions.filter(t => t.balance !== null && t.balance !== undefined);
+        if (withBalance.length) {
+            balance = withBalance[withBalance.length - 1].balance;
+        }
+    }
+
+    const dates = transactions.map(t => t.date).filter(Boolean);
 
     return {
-
         transactions,
-
         income,
-
         expenses,
-
-        savings:
-            income - expenses,
-
-        balance:
-            income - expenses,
-
-        categories
-
+        savings: income - expenses,
+        balance: balance === null ? income - expenses : balance,
+        balanceFromStatement: balance !== null,
+        internalVolume,
+        categories,
+        periodStart: dates.length ? dates[0] : null,
+        periodEnd: dates.length ? dates[dates.length - 1] : null
     };
 }
-
-// ========================================
-// EMPTY DATA
-// ========================================
 
 function emptyData() {
-
     return {
-
         transactions: [],
-
         income: 0,
-
         expenses: 0,
-
         savings: 0,
-
         balance: 0,
-
-        categories: {
-
-            Food: 0,
-
-            Transport: 0,
-
-            Bills: 0,
-
-            Entertainment: 0,
-
-            Shopping: 0,
-
-            Transfers: 0,
-
-            Other: 0
-
-        }
-
+        balanceFromStatement: false,
+        internalVolume: 0,
+        categories: emptyCategories(),
+        periodStart: null,
+        periodEnd: null
     };
-}
-
-// ========================================
-// MONEY PARSER
-// ========================================
-
-function parseMoney(value) {
-
-    if (
-        value === undefined ||
-        value === null
-    ) {
-
-        return 0;
-    }
-
-    const raw =
-        String(value)
-            .trim();
-
-    if (!raw) {
-        return 0;
-    }
-
-    const negative =
-        raw.includes("-") ||
-        (
-            raw.includes("(") &&
-            raw.includes(")")
-        );
-
-    const number =
-        parseFloat(
-            raw.replace(
-                /[₦$£NGN,\s()]/gi,
-                ""
-            )
-        );
-
-    if (
-        isNaN(number)
-    ) {
-
-        return 0;
-    }
-
-    return negative
-        ? -Math.abs(number)
-        : number;
 }
 
 // ========================================
@@ -1715,6 +1078,26 @@ function updateDashboard(data) {
 
     }
 
+    // PERIOD LABELS (replace hardcoded "August" / "This Month")
+    const budgetMonth =
+        document.querySelector(".budget .section-title span");
+
+    const spendingPeriod =
+        document.querySelector(".spending .section-title span");
+
+    if (budgetMonth && data.periodEnd) {
+        budgetMonth.textContent =
+            data.periodEnd.toLocaleDateString("en-NG", {
+                month: "long",
+                year: "numeric"
+            });
+    }
+
+    if (spendingPeriod && data.periodStart && data.periodEnd) {
+        spendingPeriod.textContent =
+            formatDate(data.periodStart) + " – " + formatDate(data.periodEnd);
+    }
+
     updateTransactions(data);
 
     updateSpending(data);
@@ -1759,6 +1142,8 @@ function updateTransactions(data) {
     list.innerHTML =
         data.transactions
 
+            .filter(transaction => !transaction.internal)
+
             .slice(-8)
 
             .reverse()
@@ -1788,7 +1173,11 @@ function updateTransactions(data) {
                                 <small>
                                     ${escapeHTML(
                                         transaction.category
-                                    )}
+                                    )}${
+                                        transaction.dateLabel
+                                            ? " · " + escapeHTML(transaction.dateLabel)
+                                            : ""
+                                    }
                                 </small>
 
                             </div>
@@ -2147,7 +1536,7 @@ function showUploadError() {
     if (message) {
 
         message.textContent =
-            "Make sure you're using a valid Kuda CSV, XLSX, XLS, or PDF statement.";
+            "Make sure it's a bank statement (CSV, XLSX, XLS or a text-based PDF), not a scanned photo.";
 
     }
 
